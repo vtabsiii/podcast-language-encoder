@@ -154,6 +154,8 @@ describe('PolycastApiStack', () => {
   test('migration custom resource runs the migrate task before the API service', () => {
     template.hasResourceProperties('Custom::PolycastMigration', {
       ContainerName: 'migrate',
+      LogStreamPrefix: 'migrate',
+      LogGroupName: Match.objectLike({ Ref: Match.stringLikeRegexp('ApiLogs') }),
       TaskDefinitionArn: Match.objectLike({ Ref: Match.stringLikeRegexp('MigrateTask') }),
       SecurityGroupIds: [Match.objectLike({ 'Fn::GetAtt': Match.arrayWith(['GroupId']) })],
     });
