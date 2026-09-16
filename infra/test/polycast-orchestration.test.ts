@@ -98,7 +98,7 @@ describe('PolycastOrchestrationStack', () => {
             Match.objectLike({ Name: 'WORKER_QUEUE_URL' }),
             Match.objectLike({ Name: 'MEDIA_BUCKET_SOURCE' }),
           ]),
-          Secrets: [Match.objectLike({ Name: 'WORKER_TOKEN' })],
+          Secrets: Match.arrayWith([Match.objectLike({ Name: 'WORKER_TOKEN' })]),
         }),
       ],
     });
@@ -245,5 +245,37 @@ describe('PolycastOrchestrationStack with an SES sender', () => {
       (e: { Name: string }) => e.Name,
     );
     expect(names).not.toContain('SES_FROM_ADDRESS');
+  });
+});
+
+describe('PolycastOrchestrationStack lip-sync provider', () => {
+  test('defaults to the mock and injects the sync.so key from the polycast/synclabs secret', () => {
+    const template = Template.fromStack(buildPolycastApp().orchestration);
+    template.hasResourceProperties('AWS::SecretsManager::Secret', {
+      Name: 'polycast/synclabs',
+    });
+    template.hasResourceProperties('AWS::ECS::TaskDefinition', {
+      ContainerDefinitions: [
+        Match.objectLike({
+          Name: 'media-worker',
+          Environment: Match.arrayWith([{ Name: 'LIP_SYNC_PROVIDER', Value: 'mock' }]),
+          Secrets: Match.arrayWith([Match.objectLike({ Name: 'SYNCLABS_API_KEY' })]),
+        }),
+      ],
+    });
+    template.hasOutput('SyncLabsSecretArn', {});
+  });
+
+  test('selects sync.so when asked', () => {
+    Template.fromStack(
+      buildPolycastApp({ lipSyncProvider: 'synclabs' }).orchestration,
+    ).hasResourceProperties('AWS::ECS::TaskDefinition', {
+      ContainerDefinitions: [
+        Match.objectLike({
+          Name: 'media-worker',
+          Environment: Match.arrayWith([{ Name: 'LIP_SYNC_PROVIDER', Value: 'synclabs' }]),
+        }),
+      ],
+    });
   });
 });

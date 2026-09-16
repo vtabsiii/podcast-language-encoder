@@ -37,7 +37,8 @@ python -m polycast_worker.notify --kind ready --to reviewer@example.test --ref <
 `ffmpeg`/`ffprobe` are used when present (`Tools.detect()`); without them the worker still
 handles PCM WAV sources through the stdlib `wave` module so the M1 slice runs on a bare
 CI image. Non-WAV sources without ffmpeg fail with a retryable `TOOL_UNAVAILABLE`. In aws
-mode ffmpeg is required for TIMING (atempo) and MIXING (remix + loudnorm).
+mode ffmpeg is required for TIMING (atempo), MIXING (remix + loudnorm) and LIP_SYNCING (the
+dubbed speech track).
 
 ## Environment
 
@@ -67,6 +68,52 @@ mode ffmpeg is required for TIMING (atempo) and MIXING (remix + loudnorm).
 | `MEDIACONVERT_ROLE_ARN`, `MEDIACONVERT_QUEUE_ARN` | – | required when `ENCODE_PROVIDER=mediaconvert` |
 | `SES_FROM_ADDRESS` | – | verified SES sender; optional. Without it email notifications are off and every notification goes to the in-app list only |
 | `TRANSCRIBE_DATA_ACCESS_ROLE_ARN` | – | optional `JobExecutionSettings.DataAccessRoleArn` for Transcribe |
+| `LIP_SYNC_PROVIDER` | `mock` | `mock` (never applied, tier `unavailable`) or `synclabs` (sync.so, tier `beta`); see below |
+| `SYNCLABS_API_KEY` | – | required when `LIP_SYNC_PROVIDER=synclabs`; an empty value with `mock` is fine (the deployed default) |
+| `SYNCLABS_API_URL` | `https://api.sync.so` | base URL; must be `https://` |
+| `SYNCLABS_MODEL` | `lipsync-2` | model name sent in the request and recorded as the adapter version |
+| `SYNCLABS_SYNC_MODE` | `bounce` | `options.sync_mode` (how the vendor reconciles audio/video length) |
+| `PROVIDER_URL_TTL_SECONDS` | `3600` | lifetime of the presigned S3 GET URLs handed to external providers |
+
+### Lip sync (sync.so)
+
+`providers/synclabs.py::SyncLabsLipSyncProvider` is the first real `LipSyncProvider`
+(adapter id `synclabs-lipsync`, tier `beta`, version = `SYNCLABS_MODEL`). It is wired only in
+`PROVIDER_MODE=aws` with `LIP_SYNC_PROVIDER=synclabs`; local mode always uses the mock, and
+selecting `synclabs` without `SYNCLABS_API_KEY` refuses to start in every environment.
+
+For a video target with `lipSync: true` the `LIP_SYNCING` stage builds the **dubbed speech
+track** (`providers/ffmpeg.py::build_speech_track`: every fitted speech render at its segment
+start over silence, mono 48 kHz WAV, uploaded as `{derivedPrefix}lip-sync/speech-track.wav`),
+presigns the source video and the track (`Storage.presigned_get_url`, S3 only), and submits
+one whole-episode job:
+
+```
+POST {SYNCLABS_API_URL}/v2/generate            x-api-key: <SYNCLABS_API_KEY>
+{"model": "<SYNCLABS_MODEL>",
+ "input": [{"type": "video", "url": <https>}, {"type": "audio", "url": <https>}],
+ "options": {"sync_mode": "<SYNCLABS_SYNC_MODE>"}}            → {"id", "status"}
+GET  {SYNCLABS_API_URL}/v2/generate/{id}       → {"status", "outputUrl"?, "error"?}
+```
+
+`status` is matched case-insensitively (`PENDING`/`PROCESSING` keep polling, `COMPLETED`
+finishes, anything containing `fail`/`error`/`reject` fails the task with terminal
+`LIP_SYNC_FAILED`); the output URL is read from `outputUrl`, `output_url`, `outputURL` or
+`url`. The MP4 is streamed to a temp file and stored as `{derivedPrefix}lip-sync/<job id>.mp4`.
+The API reports no sync confidence, so a completed job records `syncConfidence: 1.0` unless the
+payload carries a numeric `syncConfidence`/`confidence`. The stage output (`applied: true`, the
+video on every render and top-level `video`) is also persisted as `lip-sync.json`; `ENCODING`
+then uses the lip-synced video as its source (picture from the vendor, audio from `mix.wav`) and
+`PACKAGING` sets `lipSyncApplied: true` with a matching disclosure.
+
+HTTP goes through the standard library (`urllib.request`, timeouts on every call, `https` only).
+The key travels in the `x-api-key` header and the presigned URLs in the request body; neither
+is logged or placed in an error message, and the vendor's `error` text is not echoed either.
+The request/response contract was implemented from the published v2 shape and is fully
+configurable; **it has not yet been run against the live service from this repository**, so
+the first live run should confirm the field names above, the accepted `sync_mode` values and
+the output URL's lifetime. Audio-only targets, `lipSync: false` and the mock adapter keep the
+M1 behaviour (`applied: false`).
 
 Production (`POLYCAST_ENV=production`) refuses to start unless `PROVIDER_MODE=aws`,
 `STORAGE_DRIVER=s3`, a non-default `WORKER_TOKEN`, `WORKER_QUEUE_URL` and `MEDIA_BUCKET_SOURCE`
@@ -92,7 +139,7 @@ are created lazily by `providers/aws/clients.py::ClientFactory`, so tests inject
 | transcription | `MockTranscriptionProvider` | `providers/aws/transcribe.py` (batch job, speaker labels, `IdentifyLanguage` or the declared locale, output under the task's derived prefix) | `aws-transcribe` / beta | `transcribe:StartTranscriptionJob`, `transcribe:GetTranscriptionJob` |
 | translation | `MockTranslationProvider` | `providers/aws/translate.py` (`TranslateText`, batched ≤ 10,000 bytes, formality where supported, terminology) or `providers/aws/bedrock.py` (`Converse`, entity-preserving prompt, per-segment `maxChars` from the timing budget; `promptVersion` = `bedrock-v1:<sha256[:8]>`) | `aws-translate` / `aws-bedrock` / beta | `translate:TranslateText` (+ `translate:GetTerminology` when configured); `bedrock:InvokeModel` (Converse) |
 | speech | `MockSpeechProvider` | `providers/aws/polly.py` (`SynthesizeSpeech` PCM 16 kHz + word speech marks; duration from the PCM byte length) | `aws-polly` / beta, `unavailable` for locales without a neural voice | `polly:SynthesizeSpeech`, `polly:DescribeVoices` |
-| lipSync | `MockLipSyncProvider` | same mock (vendor arrives in M4) | `mock-lipSync` / unavailable | – |
+| lipSync | `MockLipSyncProvider` | `providers/synclabs.py::SyncLabsLipSyncProvider` when `LIP_SYNC_PROVIDER=synclabs` (sync.so `/v2/generate`, whole-episode job over presigned inputs, output stored under the derived prefix), else the mock | `synclabs-lipsync` / beta; `mock-lipSync` / unavailable | `s3:GetObject` presign on source + derived (the vendor fetches over HTTPS) |
 | encode | `FfmpegEncodeProvider` (tier unavailable in local mode) | `FfmpegEncodeProvider` or `providers/aws/mediaconvert.py` (`CreateJob` MP4 H.264 + AAC from source video + mix, MP3 for audio-only; `GetJob` polling) | `ffmpeg-encode` / `aws-mediaconvert` / beta | `mediaconvert:CreateJob`, `mediaconvert:GetJob`, `iam:PassRole` on the MediaConvert role |
 | quality | `MockQualityProvider` (M1 "flag one segment" fixture) | `providers/quality.py::InHouseQualityProvider` | `inhouse-quality` / beta | – |
 | notifier | `InAppNotifier` (JSON list under the derived bucket) | `providers/aws/ses.py::SesNotifier` (`SendEmail`, plain text) | `aws-ses` | `ses:SendEmail` |
@@ -153,24 +200,25 @@ hooks); when omitted the local mock set is used, which is what the M1 tests exer
 | `TRANSLATING` | `params-target` | – | – | `[{locale}] text` / `[{locale} vN] text`; a hint containing `shorter` drops the last word | Translate or Bedrock; the entity check (`qc/entity_check.py`) runs once here and logs a count only |
 | `SYNTHESIZING` | `params-target` | – | aws: `{derivedPrefix}speech/<segmentId>.wav` | `measuredDurationUs = words × 400 ms`, voice `mock-{locale}-1`, no audio | Polly PCM 16 kHz; `VOICE_UNAVAILABLE` (terminal) for locales without a voice |
 | `TIMING` | `params-target` | `speech/<id>.wav` (SYNTHESIZING) | `{derivedPrefix}speech/<segmentId>.fit.wav` | ratio = measured / budget: `< 0.88` → `none`; `0.88–1.12` → `rate`; else boundary shift ≤ 120 ms, otherwise `retranslate` (fits = false) | same arithmetic, plus ffmpeg `atempo` applied to the render when it exists |
-| `LIP_SYNCING` | `params-target` | – | – | mock, `applied: false`, confidence 0.0 | same mock until M4 |
+| `LIP_SYNCING` | `params-target` | source video, fitted/raw speech WAVs | `{derivedPrefix}lip-sync/speech-track.wav`, `{derivedPrefix}lip-sync/<job>.mp4`, `{derivedPrefix}lip-sync.json` | mock, `applied: false`, confidence 0.0 | sync.so when selected and the target is a video with `lipSync: true` (`applied: true`, lip-synced `video` on every render); otherwise the mock path |
 | `MIXING` | `params-target` | source, fitted/raw speech WAVs | `{derivedPrefix}mix.wav` | stereo 48 kHz `loudnorm=I=-16:TP=-1` of the source (mock renders carry no audio); fixture `-16 / -1` without ffmpeg | speech placed at each segment start over the bed ducked to 0.15 during dialogue, two-pass `loudnorm` to −16 LUFS stereo / −19 mono, TP −1, measured with `ebur128` |
-| `ENCODING` | `params-target` | source, `mix.wav` | `{derivedPrefix}encode.mp4` / `.mp3` | ffmpeg (video copied + AAC 128k, or MP3 128k); source bytes without ffmpeg | ffmpeg, or MediaConvert polled every 5 s |
+| `ENCODING` | `params-target` | source (or the lip-synced video from `lip-sync.json`), `mix.wav` | `{derivedPrefix}encode.mp4` / `.mp3` | ffmpeg (video copied + AAC 128k, or MP3 128k); source bytes without ffmpeg | ffmpeg, or MediaConvert polled every 5 s |
 | `TARGET_QA` | `params-target` | `mix.wav`, `speech/<id>.fit.wav` | – | mock: `dialogue-coverage`, `loudness-integrated`, `true-peak`, `caption-timing`, `entity-preservation`; flags exactly one `entity-preservation` warning while the lowest-seq segment's translation is generation 1 | in-house: coverage (missing translation/speech or > 300 ms overrun → critical), `boundary-drift` (> 120 ms → warning), loudness ± 1 LU, true peak ≤ −1 dBTP, `caption-timing` (≤ 2 × 42 chars), entity preservation, `frame-preservation` for video (passes: lip sync is not applied) |
-| `PACKAGING` | `params-target` (+ `packageVersion`, `provenance`) | `encode.*` | `episode.{locale}.{mp4,mp3}`, `captions.{locale}.srt/.vtt`, `transcript.{locale}.json`, `qc-report.json`, `provenance.json`, `checksums.sha256` | manifest `mock: true`, tier `unavailable` | manifest `mock: false`, `syntheticVoice: true`, models = the registry's records for the target locale (all `beta`) |
+| `PACKAGING` | `params-target` (+ `packageVersion`, `provenance`) | `encode.*`, `lip-sync.json` | `episode.{locale}.{mp4,mp3}`, `captions.{locale}.srt/.vtt`, `transcript.{locale}.json`, `qc-report.json`, `provenance.json`, `checksums.sha256` | manifest `mock: true`, tier `unavailable` | manifest `mock: false`, `syntheticVoice: true`, `lipSyncApplied` from `lip-sync.json`, models = the registry's records for the target locale (all `beta`) |
 
 The API mints a per-stage `derivedPrefix` (`…/targets/{id}/{stage}/`). A stage that needs an
 earlier artefact (`ENCODING` and `TARGET_QA` → `mix.wav`, `PACKAGING` → `encode.*`,
-`TIMING`/`MIXING`/`TARGET_QA` → `speech/*.wav`) looks under its own prefix first and then under
-the sibling stage's prefix (`stages/common.py::find_artifact`). `checksums.sha256` covers every
+`TIMING`/`MIXING`/`TARGET_QA`/`LIP_SYNCING` → `speech/*.wav`, `ENCODING`/`PACKAGING` →
+`lip-sync.json`) looks under its own prefix first and then under the sibling stage's prefix
+(`stages/common.py::find_artifact`). `checksums.sha256` covers every
 other deliverable including `provenance.json`; the manifest's `files` therefore lists everything
 except `provenance.json` and `checksums.sha256` (the two cannot hash each other).
 
 Failures inside a handler become a failed `TaskResult`; `retryable` is only set for
 transient I/O (`STORAGE_IO`, `TRANSIENT_IO`, `TOOL_UNAVAILABLE`) and provider throttling /
 outages (`PROVIDER_THROTTLED`, `PROVIDER_UNAVAILABLE`, `PROVIDER_BAD_OUTPUT`, `PROVIDER_TIMEOUT`).
-Contract and validation problems, `TRANSCRIPTION_FAILED`, `ENCODE_FAILED`, `VOICE_UNAVAILABLE`
-and `PROVIDER_ERROR` are terminal. One bad task never stops the loop.
+Contract and validation problems, `TRANSCRIPTION_FAILED`, `ENCODE_FAILED`, `LIP_SYNC_FAILED`,
+`LIP_SYNC_NO_SPEECH`, `VOICE_UNAVAILABLE` and `PROVIDER_ERROR` are terminal. One bad task never stops the loop.
 
 ## Tests
 

@@ -91,6 +91,19 @@ class _FakeS3:
     def download_file(self, bucket: str, key: str, filename: str) -> None:
         Path(filename).write_bytes(self._get(bucket, key)[0])
 
+    def generate_presigned_url(
+        self,
+        operation: str,
+        *,
+        Params: dict[str, str],  # noqa: N803
+        ExpiresIn: int,  # noqa: N803
+    ) -> str:
+        assert operation == "get_object"
+        return (
+            f"https://{Params['Bucket']}.s3.amazonaws.com/{Params['Key']}"
+            f"?X-Amz-Expires={ExpiresIn}&X-Amz-Signature=fake"
+        )
+
     def _get(self, bucket: str, key: str) -> tuple[bytes, str]:
         try:
             return self.objects[(bucket, key)]
@@ -137,3 +150,19 @@ def test_s3_storage_maps_operations_onto_the_client(tmp_path: Path):
         store.get("s3://derived/missing/key")
     with pytest.raises(StorageUriError):
         store.get("local://derived/x/y")
+
+
+def test_presigned_get_urls(tmp_path: Path):
+    store = S3Storage(client=_FakeS3())
+    url = store.presigned_get_url("s3://derived/org/t/lip-sync/speech-track.wav", 1800)
+    assert url.startswith("https://derived.s3.amazonaws.com/org/t/lip-sync/speech-track.wav?")
+    assert "X-Amz-Expires=1800" in url
+    with pytest.raises(ValueError):
+        store.presigned_get_url("s3://derived/org/t/mix.wav", 0)
+    with pytest.raises(StorageUriError):
+        store.presigned_get_url("local://derived/org/t/mix.wav", 60)
+    # The filesystem driver is not reachable by an external vendor.
+    local = LocalFsStorage(tmp_path / "root")
+    with pytest.raises(StorageUriError, match="STORAGE_DRIVER=s3"):
+        local.presigned_get_url("local://derived/org/t/mix.wav", 60)
+    assert isinstance(local, Storage)

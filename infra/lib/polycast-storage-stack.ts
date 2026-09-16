@@ -98,9 +98,22 @@ export class PolycastStorageStack extends cdk.Stack {
       ],
     });
 
+    // The review studio fetches waveforms and audio through presigned GET URLs from the
+    // browser, which needs CORS for the web origins (media elements do not, fetch() does).
+    const readOnlyCors: s3.CorsRule[] = [
+      {
+        allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD],
+        allowedOrigins: webOrigins,
+        allowedHeaders: ['*'],
+        exposedHeaders: ['ETag', 'Content-Length', 'Content-Range', 'Accept-Ranges'],
+        maxAge: 3600,
+      },
+    ];
+
     this.derivedBucket = new s3.Bucket(this, 'DerivedBucket', {
       ...bucketDefaults,
       bucketName: bucketName('derived'),
+      cors: readOnlyCors,
       lifecycleRules: [
         {
           id: 'expire-derived',
@@ -113,6 +126,7 @@ export class PolycastStorageStack extends cdk.Stack {
     this.deliverablesBucket = new s3.Bucket(this, 'DeliverablesBucket', {
       ...bucketDefaults,
       bucketName: bucketName('deliverables'),
+      cors: readOnlyCors,
       versioned: true,
       lifecycleRules: [
         { id: 'abort-incomplete', abortIncompleteMultipartUploadAfter: cdk.Duration.days(7) },

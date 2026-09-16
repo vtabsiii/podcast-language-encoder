@@ -33,7 +33,15 @@ Transcribe, Translate and Polly.
 4. **AWS-native first.** M3 wires Amazon Transcribe, Translate, Polly, MediaConvert because they
    satisfy the data-processing requirements under existing AWS terms; an LLM translation adapter
    (Bedrock) and a second TTS vendor follow. Lip sync (M4) is an open decision between a licensed
-   model self-hosted on GPU Batch (preferred for biometric data handling) and a vendor API.
+   model self-hosted on GPU Batch (preferred for biometric data handling) and a vendor API. The
+   first adapter is the vendor API route (sync.so `lipsync-2`, `providers/synclabs.py`), chosen so
+   the end-to-end path can be exercised before a GPU Batch model is licensed. It registers at
+   tier `beta` and stays there: promotion needs the benchmark gate (A/V offset, sync confidence,
+   frame preservation), the vendor's data-processing descriptor and a signed contract, none of
+   which exist yet, and the adapter has not been run against the live service from this
+   repository. Source video and the dubbed speech track leave AWS for the vendor over presigned
+   HTTPS URLs (`PROVIDER_URL_TTL_SECONDS`), which the privacy review must cover before any
+   customer target uses it.
 
 ## Consequences
 

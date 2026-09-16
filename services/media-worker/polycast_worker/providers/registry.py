@@ -2,7 +2,8 @@
 
     PROVIDER_MODE=local → Mock* adapters (tier "unavailable"), M1 behaviour unchanged
     PROVIDER_MODE=aws   → Amazon adapters (tier "beta"; never "production" — promotion is
-                          only via docs/quality-benchmark.md)
+                          only via docs/quality-benchmark.md); lip sync is the sync.so adapter
+                          when LIP_SYNC_PROVIDER=synclabs, else the mock ("unavailable")
 
 Stage handlers never instantiate adapters; they receive a ProviderSet through StageEnv.
 """
@@ -44,6 +45,7 @@ from .mock import (
     MockTranslationProvider,
 )
 from .quality import InHouseQualityProvider
+from .synclabs import SyncLabsLipSyncProvider
 
 ProviderMode = Literal["local", "aws"]
 
@@ -152,6 +154,22 @@ def build_providers(
         scheme = "s3" if cfg.storage_driver == "s3" else "local"
         notifier = InAppNotifier(storage, f"{scheme}://{cfg.derived_bucket}/{NOTIFICATIONS_FILE}")
 
+    lip_sync: LipSyncProvider
+    if cfg.lip_sync_provider == "synclabs":
+        if not cfg.synclabs_api_key:
+            raise RuntimeError("LIP_SYNC_PROVIDER=synclabs requires SYNCLABS_API_KEY")
+        lip_sync = SyncLabsLipSyncProvider(
+            cfg.synclabs_api_key,
+            storage=storage,
+            tools=tools,
+            api_url=cfg.synclabs_api_url,
+            model=cfg.synclabs_model,
+            sync_mode=cfg.synclabs_sync_mode,
+            url_ttl_s=cfg.provider_url_ttl_s,
+        )
+    else:
+        lip_sync = MockLipSyncProvider()  # no vendor key configured; stays "unavailable"
+
     return ProviderSet(
         mode="aws",
         region=cfg.region,
@@ -160,7 +178,7 @@ def build_providers(
         ),
         translation=translation,
         speech=PollyProvider(clients, engine=cfg.polly_engine),
-        lip_sync=MockLipSyncProvider(),  # no lip-sync vendor until M4; stays "unavailable"
+        lip_sync=lip_sync,
         encode=encode,
         quality=InHouseQualityProvider(region=cfg.region),
         notifier=notifier,

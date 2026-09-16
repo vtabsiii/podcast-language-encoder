@@ -38,6 +38,11 @@ on:
         required: false
         default: ''
         type: string
+      lipSyncProvider:
+        description: 'Lip-sync vendor for the media worker: mock (default) or synclabs (store the API key in the polycast/synclabs secret first)'
+        required: false
+        default: ''
+        type: string
       resendInvitation:
         description: "Any new value (e.g. today's date and time) re-sends the invitation to adminEmail with a fresh temporary password"
         required: false
@@ -63,6 +68,7 @@ jobs:
       SES_FROM_ADDRESS: ${{ inputs.sesFromAddress }}
       ADMIN_EMAIL: ${{ inputs.adminEmail }}
       ADMIN_RESEND: ${{ inputs.resendInvitation }}
+      LIP_SYNC_PROVIDER: ${{ inputs.lipSyncProvider }}
     steps:
       - name: Check confirmation
         if: ${{ inputs.confirm != 'deploy-polycast' }}
@@ -126,6 +132,7 @@ jobs:
           ${SES_FROM_ADDRESS:+-c polycastSesFromAddress="$SES_FROM_ADDRESS"}
           ${ADMIN_EMAIL:+-c polycastAdminEmail="$ADMIN_EMAIL"}
           ${ADMIN_RESEND:+-c polycastAdminResend="$ADMIN_RESEND"}
+          ${LIP_SYNC_PROVIDER:+-c polycastLipSyncProvider="$LIP_SYNC_PROVIDER"}
           || true
 
       - name: cdk deploy
@@ -140,6 +147,7 @@ jobs:
           ${SES_FROM_ADDRESS:+-c polycastSesFromAddress="$SES_FROM_ADDRESS"}
           ${ADMIN_EMAIL:+-c polycastAdminEmail="$ADMIN_EMAIL"}
           ${ADMIN_RESEND:+-c polycastAdminResend="$ADMIN_RESEND"}
+          ${LIP_SYNC_PROVIDER:+-c polycastLipSyncProvider="$LIP_SYNC_PROVIDER"}
           --outputs-file cdk-outputs.json
 
       - name: cdk deploy (second pass with the CloudFront origin)
@@ -155,6 +163,7 @@ jobs:
             ${SES_FROM_ADDRESS:+-c polycastSesFromAddress="$SES_FROM_ADDRESS"} \
             ${ADMIN_EMAIL:+-c polycastAdminEmail="$ADMIN_EMAIL"} \
             ${ADMIN_RESEND:+-c polycastAdminResend="$ADMIN_RESEND"} \
+            ${LIP_SYNC_PROVIDER:+-c polycastLipSyncProvider="$LIP_SYNC_PROVIDER"} \
             --outputs-file cdk-outputs.json
 
       - name: Show stack outputs

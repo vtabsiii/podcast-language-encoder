@@ -29,6 +29,7 @@ from polycast_worker.providers.inapp import InAppNotifier
 from polycast_worker.providers.mock import MockLipSyncProvider, MockTranslationProvider
 from polycast_worker.providers.quality import InHouseQualityProvider
 from polycast_worker.providers.registry import build_providers
+from polycast_worker.providers.synclabs import SyncLabsLipSyncProvider
 from polycast_worker.stages import packaging
 from polycast_worker.tools import Tools
 
@@ -182,3 +183,39 @@ def test_packaging_manifest_in_aws_mode_is_honest(tmp_path: Path) -> None:
         "ffmpeg-encode",
         "inhouse-quality",
     }
+
+
+def test_aws_mode_wires_synclabs_only_when_selected(tmp_path: Path) -> None:
+    storage = MemoryStorage()
+    default = aws_providers({}, storage, SYNCLABS_API_KEY="sk-unused")
+    assert isinstance(default.lip_sync, MockLipSyncProvider)
+    assert [r.adapterId for r in default.capabilities(lip_sync=True) if r.kind == "lipSync"] == [
+        "mock-lipSync"
+    ]
+    providers = aws_providers(
+        {},
+        storage,
+        LIP_SYNC_PROVIDER="synclabs",
+        SYNCLABS_API_KEY="sk-test",
+        SYNCLABS_MODEL="lipsync-2",
+        SYNCLABS_SYNC_MODE="bounce",
+    )
+    assert isinstance(providers.lip_sync, SyncLabsLipSyncProvider)
+    assert isinstance(providers.lip_sync, LipSyncProvider)
+    lip = [r for r in providers.capabilities(lip_sync=True) if r.kind == "lipSync"]
+    assert [(r.adapterId, r.tier, r.version) for r in lip] == [
+        ("synclabs-lipsync", "beta", "lipsync-2")
+    ]
+    assert all(r.kind != "lipSync" for r in providers.capabilities())
+    assert all(r.tier != "production" for r in providers.capabilities(lip_sync=True))
+    # Local mode never talks to a vendor, whatever the selection says.
+    cfg = WorkerConfig.from_env(
+        {
+            "LIP_SYNC_PROVIDER": "synclabs",
+            "SYNCLABS_API_KEY": "sk-test",
+            "LOCAL_STORAGE_DIR": str(tmp_path),
+        }
+    )
+    assert isinstance(build_providers(cfg, tools=Tools.none()).lip_sync, MockLipSyncProvider)
+    with pytest.raises(RuntimeError, match="SYNCLABS_API_KEY"):
+        aws_config(LIP_SYNC_PROVIDER="synclabs")

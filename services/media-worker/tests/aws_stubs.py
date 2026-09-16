@@ -117,6 +117,10 @@ class MemoryStorage:
     def size(self, uri: str) -> int:
         return len(self.get(uri))
 
+    def presigned_get_url(self, uri: str, ttl_s: int) -> str:
+        u = parse_uri(self._key(uri))
+        return f"https://storage.test/{u.bucket}/{u.key}?X-Amz-Expires={ttl_s}"
+
 
 def aws_config(**overrides: str) -> WorkerConfig:
     env = {"PROVIDER_MODE": "aws", "AWS_REGION": REGION, "MEDIA_BUCKET_DERIVED": "derived"}

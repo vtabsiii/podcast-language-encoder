@@ -1,8 +1,10 @@
 """Object storage behind one small Protocol.
 
 URIs are `local://bucket/key` (filesystem driver, shared with the API's local driver) or
-`s3://bucket/key` (MinIO in docker compose, S3 in AWS). The worker only ever sees URIs;
-it never mints signed URLs and never logs keys.
+`s3://bucket/key` (MinIO in docker compose, S3 in AWS). The worker only ever sees URIs and
+never logs keys. The one place it mints a signed URL is `presigned_get_url`, which external
+vendor adapters (lip sync) use so the vendor can fetch an object over HTTPS; the URL goes to
+the vendor request only and is never logged.
 """
 
 from __future__ import annotations
@@ -76,6 +78,9 @@ class Storage(Protocol):
     def exists(self, uri: str) -> bool: ...
     def sha256(self, uri: str) -> str: ...
     def size(self, uri: str) -> int: ...
+    def presigned_get_url(self, uri: str, ttl_s: int) -> str:
+        """HTTPS URL an external service can GET for `ttl_s` seconds. Never log the result."""
+        ...
 
 
 class LocalFsStorage:
@@ -146,6 +151,12 @@ class LocalFsStorage:
             return self.path_for(uri).stat().st_size
         except OSError as e:
             raise StorageError("failed to stat object") from e
+
+    def presigned_get_url(self, uri: str, ttl_s: int) -> str:
+        self.path_for(uri)
+        raise StorageUriError(
+            "local storage cannot issue fetchable URLs; external providers need STORAGE_DRIVER=s3"
+        )
 
 
 class S3Storage:
@@ -245,3 +256,19 @@ class S3Storage:
             return length
         except Exception as e:
             raise StorageError("failed to stat object") from e
+
+    def presigned_get_url(self, uri: str, ttl_s: int) -> str:
+        bucket, key = self._split(uri)
+        if ttl_s <= 0:
+            raise ValueError("presigned url ttl must be positive")
+        try:
+            url = str(
+                self._client.generate_presigned_url(
+                    "get_object", Params={"Bucket": bucket, "Key": key}, ExpiresIn=int(ttl_s)
+                )
+            )
+        except Exception as e:
+            raise StorageError("failed to presign object") from e
+        if not url.startswith("https://"):
+            raise StorageError("presigned url is not https")
+        return url

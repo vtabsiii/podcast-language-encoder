@@ -214,6 +214,8 @@ export const LipSyncOutputSchema = z.object({
       video: StorageUriSchema.nullable(),
     }),
   ),
+  /** Whole-episode lip-synced video when the adapter renders the episode in one job. */
+  video: StorageUriSchema.nullable().optional(),
 });
 
 export const MixingOutputSchema = z.object({

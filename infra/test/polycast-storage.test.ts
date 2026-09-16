@@ -133,3 +133,21 @@ describe('PolycastStorageStack', () => {
     }
   });
 });
+
+describe('PolycastStorageStack browser access', () => {
+  test('derived and deliverables buckets allow read-only CORS from the web origins', () => {
+    const { storage } = buildPolycastApp({ webOrigins: ['https://app.example.test'] });
+    const template = Template.fromStack(storage);
+    const buckets = template.findResources('AWS::S3::Bucket');
+    const withReadCors = Object.values(buckets).filter((b) => {
+      const rules = b.Properties?.CorsConfiguration?.CorsRules ?? [];
+      return rules.some(
+        (r: { AllowedMethods: string[]; AllowedOrigins: string[] }) =>
+          r.AllowedMethods.includes('GET') &&
+          !r.AllowedMethods.includes('PUT') &&
+          r.AllowedOrigins.includes('https://app.example.test'),
+      );
+    });
+    expect(withReadCors).toHaveLength(2);
+  });
+});

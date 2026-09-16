@@ -3,7 +3,9 @@
     ffmpeg        MP4 with copied video + AAC 128k, or MP3 128k (synchronous, in-worker)
     mediaconvert  CreateJob / GetJob polled every 5 s with lease heartbeats
 
-Both write `encode.<ext>` under this stage's derived prefix.
+Both write `encode.<ext>` under this stage's derived prefix. When LIP_SYNCING produced a
+lip-synced video for this target it is the encode source (its picture, the MIXING audio);
+otherwise the original source is.
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from .common import (
     resolve_env,
     workdir,
 )
+from .lip_syncing import find_lip_sync_video
 from .mixing import MIX_FILE
 
 
@@ -30,6 +33,10 @@ def run(
     env = resolve_env(env, storage, tools)
     params = task.target_params()
     source_uri = require_source(task)
+    if params.metadata.video is not None:
+        lip_synced = find_lip_sync_video(task, storage)
+        if lip_synced is not None:
+            source_uri = lip_synced
     provider = env.providers.encode
     ctx = provider_context(task, env.providers.region)
     with workdir() as wd:

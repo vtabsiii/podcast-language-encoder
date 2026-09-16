@@ -101,6 +101,49 @@ test('processing view shows live stages and reaches NEEDS_REVIEW', async () => {
   reviewUrl = page.url();
 });
 
+test('review studio on a phone: actions sit above the list and issues can be stepped through', async () => {
+  // A second page in the same context keeps the session cookie but gets a phone viewport.
+  const phone = await context.newPage();
+  await phone.setViewportSize({ width: 390, height: 844 });
+  try {
+    await phone.goto(reviewUrl);
+    await expect(phone.getByRole('heading', { name: /Review es-MX/ })).toBeVisible();
+    const list = phone.getByRole('list', { name: 'Segments' });
+    const detail = phone.getByRole('region', { name: /^Segment 1\b/ });
+    const nextIssue = phone.getByRole('button', { name: 'Next open issue' });
+
+    // Without touching the list: the issue navigation is on screen and the detail panel is
+    // rendered above the list rather than below it.
+    await expect(nextIssue).toBeInViewport();
+    await expect(nextIssue).toBeEnabled();
+    await expect(phone.getByText(/Open issue 1 of 1/)).toBeVisible();
+    await expect(detail).toBeVisible();
+    const [detailBox, listBox] = await Promise.all([detail.boundingBox(), list.boundingBox()]);
+    expect(detailBox && listBox && detailBox.y < listBox.y).toBe(true);
+
+    // The flagged (selected) list item carries its own compact actions.
+    const current = list.locator('li[aria-current="true"]');
+    await expect(current.getByRole('button', { name: /^Accept /, exact: false })).toBeVisible();
+    await expect(current.getByRole('button', { name: /^Dismiss / })).toBeVisible();
+    await expect(current.getByRole('button', { name: 'Regenerate translation' })).toBeVisible();
+
+    // Moving off the flagged segment and pressing "Next open issue" wraps back to it and hands
+    // focus to the detail panel. Nothing here mutates the target, so the desktop flow below
+    // still starts from one open issue.
+    await phone.locator('body').press('j');
+    await expect(list.locator('li').nth(1)).toHaveAttribute('aria-current', 'true');
+    await expect(phone.getByText(/Open issues remaining: 1/)).toBeVisible();
+    await nextIssue.click();
+    await expect(list.locator('li').first()).toHaveAttribute('aria-current', 'true');
+    await expect(detail).toBeFocused();
+    await expect(phone.getByRole('button', { name: 'Approve target' })).toBeDisabled();
+    await expect(phone.getByText(/Resolve the 1 remaining open issue first/)).toBeVisible();
+    await expectAccessible(phone, 'review studio (phone)');
+  } finally {
+    await phone.close();
+  }
+});
+
 test('review studio: flagged segment, keyboard navigation, regenerate, approve', async () => {
   await page.goto(reviewUrl);
   await expect(page.getByRole('heading', { name: /Review es-MX/ })).toBeVisible();

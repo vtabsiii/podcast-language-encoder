@@ -16,11 +16,16 @@ DEFAULT_LOCAL_STORAGE_DIR = ".polycast-data/storage"
 DEFAULT_API_URL = "http://127.0.0.1:4000"
 DEFAULT_BEDROCK_MODEL_ID = "anthropic.claude-3-5-haiku-20241022-v1:0"
 DEFAULT_DERIVED_BUCKET = "derived"
+DEFAULT_SYNCLABS_API_URL = "https://api.sync.so"
+DEFAULT_SYNCLABS_MODEL = "lipsync-2"
+DEFAULT_SYNCLABS_SYNC_MODE = "bounce"
+DEFAULT_PROVIDER_URL_TTL_SECONDS = 3600
 
 PROVIDER_MODES = ("local", "aws")
 TRANSLATION_PROVIDERS = ("translate", "bedrock")
 POLLY_ENGINES = ("neural", "long-form", "generative")
 ENCODE_PROVIDERS = ("ffmpeg", "mediaconvert")
+LIP_SYNC_PROVIDERS = ("mock", "synclabs")
 
 
 @dataclass(frozen=True)
@@ -49,12 +54,29 @@ class WorkerConfig:
     transcribe_data_access_role_arn: str | None = None
     derived_bucket: str = DEFAULT_DERIVED_BUCKET
     translate_terminology_name: str | None = None
+    # M4 lip sync (only wired when provider_mode == "aws"): `mock` until a vendor key exists.
+    lip_sync_provider: str = "mock"
+    synclabs_api_key: str | None = None
+    synclabs_api_url: str = DEFAULT_SYNCLABS_API_URL
+    synclabs_model: str = DEFAULT_SYNCLABS_MODEL
+    synclabs_sync_mode: str = DEFAULT_SYNCLABS_SYNC_MODE
+    # Lifetime of the presigned URLs handed to external providers so they can fetch inputs.
+    provider_url_ttl_s: int = DEFAULT_PROVIDER_URL_TTL_SECONDS
 
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> WorkerConfig:
         e = env if env is not None else dict(os.environ)
         env_name = e.get("POLYCAST_ENV", "development")
         token = e.get("WORKER_TOKEN") or (DEFAULT_WORKER_TOKEN if env_name != "production" else "")
+        ttl_raw = e.get("PROVIDER_URL_TTL_SECONDS") or str(DEFAULT_PROVIDER_URL_TTL_SECONDS)
+        try:
+            url_ttl_s = int(ttl_raw)
+        except ValueError:
+            raise RuntimeError(
+                "PROVIDER_URL_TTL_SECONDS must be an integer number of seconds"
+            ) from None
+        if url_ttl_s <= 0:
+            raise RuntimeError("PROVIDER_URL_TTL_SECONDS must be positive")
         cfg = cls(
             env=env_name,
             provider_mode=e.get("PROVIDER_MODE", "local"),
@@ -78,6 +100,12 @@ class WorkerConfig:
             transcribe_data_access_role_arn=e.get("TRANSCRIBE_DATA_ACCESS_ROLE_ARN") or None,
             derived_bucket=e.get("MEDIA_BUCKET_DERIVED") or DEFAULT_DERIVED_BUCKET,
             translate_terminology_name=e.get("TRANSLATE_TERMINOLOGY_NAME") or None,
+            lip_sync_provider=e.get("LIP_SYNC_PROVIDER") or "mock",
+            synclabs_api_key=e.get("SYNCLABS_API_KEY") or None,
+            synclabs_api_url=(e.get("SYNCLABS_API_URL") or DEFAULT_SYNCLABS_API_URL).rstrip("/"),
+            synclabs_model=e.get("SYNCLABS_MODEL") or DEFAULT_SYNCLABS_MODEL,
+            synclabs_sync_mode=e.get("SYNCLABS_SYNC_MODE") or DEFAULT_SYNCLABS_SYNC_MODE,
+            provider_url_ttl_s=url_ttl_s,
         )
         if cfg.storage_driver not in ("local", "s3"):
             raise RuntimeError("STORAGE_DRIVER must be 'local' or 's3'")
@@ -100,6 +128,15 @@ class WorkerConfig:
             ]
             if missing_mc:
                 raise RuntimeError("ENCODE_PROVIDER=mediaconvert requires " + ", ".join(missing_mc))
+        if cfg.lip_sync_provider not in LIP_SYNC_PROVIDERS:
+            raise RuntimeError("LIP_SYNC_PROVIDER must be 'mock' or 'synclabs'")
+        if cfg.lip_sync_provider == "synclabs":
+            # Fails closed in every environment: a selected vendor without credentials would
+            # otherwise surface as a failed task on the first video target.
+            if not cfg.synclabs_api_key:
+                raise RuntimeError("LIP_SYNC_PROVIDER=synclabs requires SYNCLABS_API_KEY")
+            if not cfg.synclabs_api_url.startswith("https://"):
+                raise RuntimeError("SYNCLABS_API_URL must be an https:// URL")
         if cfg.env == "production":
             missing = [
                 k
