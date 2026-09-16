@@ -135,7 +135,10 @@ export const TRANSITIONS: Readonly<Record<JobState, ReadonlySet<JobState>>> = {
   ]),
   NEEDS_REVIEW: new Set<JobState>([
     'READY', // all mandatory approvals recorded
-    'SYNTHESIZING', // a segment was edited/regenerated: rerun downstream for impacted ranges
+    'TRANSLATING', // a segment's translation was regenerated: rerun the target chain for it
+    'SYNTHESIZING', // voice/timing regenerated: rerun downstream for impacted ranges
+    'TIMING', // timing regenerated for a segment
+    'LIP_SYNCING', // lip sync regenerated for a shot
     'CANCELLED',
   ]),
   READY: new Set<JobState>(['PACKAGING', 'NEEDS_REVIEW', 'CANCELLED']),

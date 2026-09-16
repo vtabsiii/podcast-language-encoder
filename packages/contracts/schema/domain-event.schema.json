@@ -29,9 +29,30 @@
               "type": "number",
               "const": 1
             },
+            "subject": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "required": [
+                "type",
+                "id"
+              ],
+              "additionalProperties": false
+            },
             "payload": {
               "type": "object",
               "properties": {
+                "projectId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
                 "jobId": {
                   "type": "string",
                   "format": "uuid"
@@ -44,32 +65,39 @@
                   "type": "string"
                 },
                 "from": {
-                  "type": "string",
-                  "enum": [
-                    "UPLOADING",
-                    "QUARANTINED",
-                    "VALIDATING",
-                    "ANALYZING",
-                    "READY_TO_CONFIGURE",
-                    "QUEUED",
-                    "TRANSCRIBING",
-                    "SOURCE_QA",
-                    "TARGETS_FAN_OUT",
-                    "TRANSLATING",
-                    "SYNTHESIZING",
-                    "TIMING",
-                    "LIP_SYNCING",
-                    "MIXING",
-                    "ENCODING",
-                    "TARGET_QA",
-                    "NEEDS_REVIEW",
-                    "READY",
-                    "PACKAGING",
-                    "COMPLETE",
-                    "RETRY_WAIT",
-                    "FAILED",
-                    "CANCEL_REQUESTED",
-                    "CANCELLED"
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "UPLOADING",
+                        "QUARANTINED",
+                        "VALIDATING",
+                        "ANALYZING",
+                        "READY_TO_CONFIGURE",
+                        "QUEUED",
+                        "TRANSCRIBING",
+                        "SOURCE_QA",
+                        "TARGETS_FAN_OUT",
+                        "TRANSLATING",
+                        "SYNTHESIZING",
+                        "TIMING",
+                        "LIP_SYNCING",
+                        "MIXING",
+                        "ENCODING",
+                        "TARGET_QA",
+                        "NEEDS_REVIEW",
+                        "READY",
+                        "PACKAGING",
+                        "COMPLETE",
+                        "RETRY_WAIT",
+                        "FAILED",
+                        "CANCEL_REQUESTED",
+                        "CANCELLED"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
                   ]
                 },
                 "to": {
@@ -109,9 +137,25 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
+                },
+                "message": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
-              "required": ["jobId", "targetJobId", "locale", "from", "to", "attempt", "progress"],
+              "required": [
+                "projectId",
+                "jobId",
+                "targetJobId",
+                "locale",
+                "from",
+                "to",
+                "attempt",
+                "progress",
+                "message"
+              ],
               "additionalProperties": false
             }
           },
@@ -122,6 +166,238 @@
             "organizationId",
             "correlationId",
             "schemaVersion",
+            "subject",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "name": {
+              "type": "string",
+              "enum": [
+                "upload.completed",
+                "asset.validated",
+                "asset.rejected",
+                "analysis.completed"
+              ]
+            },
+            "occurredAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "correlationId": {
+              "type": "string"
+            },
+            "schemaVersion": {
+              "type": "number",
+              "const": 1
+            },
+            "subject": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "required": [
+                "type",
+                "id"
+              ],
+              "additionalProperties": false
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "projectId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "assetId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "UPLOADING",
+                    "QUARANTINED",
+                    "VALIDATING",
+                    "ANALYZING",
+                    "READY_TO_CONFIGURE",
+                    "QUEUED",
+                    "TRANSCRIBING",
+                    "SOURCE_QA",
+                    "TARGETS_FAN_OUT",
+                    "TRANSLATING",
+                    "SYNTHESIZING",
+                    "TIMING",
+                    "LIP_SYNCING",
+                    "MIXING",
+                    "ENCODING",
+                    "TARGET_QA",
+                    "NEEDS_REVIEW",
+                    "READY",
+                    "PACKAGING",
+                    "COMPLETE",
+                    "RETRY_WAIT",
+                    "FAILED",
+                    "CANCEL_REQUESTED",
+                    "CANCELLED"
+                  ]
+                },
+                "reason": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "projectId",
+                "assetId",
+                "status",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "eventId",
+            "name",
+            "occurredAt",
+            "organizationId",
+            "correlationId",
+            "schemaVersion",
+            "subject",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "name": {
+              "type": "string",
+              "enum": [
+                "job.created",
+                "target.review.required",
+                "target.ready",
+                "deliverable.packaged"
+              ]
+            },
+            "occurredAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "correlationId": {
+              "type": "string"
+            },
+            "schemaVersion": {
+              "type": "number",
+              "const": 1
+            },
+            "subject": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "required": [
+                "type",
+                "id"
+              ],
+              "additionalProperties": false
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "projectId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "jobId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "targetJobId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "locale": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "projectId",
+                "jobId",
+                "targetJobId",
+                "locale"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "eventId",
+            "name",
+            "occurredAt",
+            "organizationId",
+            "correlationId",
+            "schemaVersion",
+            "subject",
             "payload"
           ],
           "additionalProperties": false
@@ -139,6 +415,7 @@
                 "project.created",
                 "upload.completed",
                 "asset.validated",
+                "asset.rejected",
                 "analysis.completed",
                 "job.created",
                 "target.stage.changed",
@@ -164,6 +441,23 @@
               "type": "number",
               "const": 1
             },
+            "subject": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "required": [
+                "type",
+                "id"
+              ],
+              "additionalProperties": false
+            },
             "payload": {
               "type": "object",
               "additionalProperties": {}
@@ -176,6 +470,7 @@
             "organizationId",
             "correlationId",
             "schemaVersion",
+            "subject",
             "payload"
           ],
           "additionalProperties": false

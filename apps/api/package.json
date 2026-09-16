@@ -16,6 +16,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1133.0",
+    "@aws-sdk/s3-request-presigner": "^3.1133.0",
     "@fastify/cors": "^10.0.1",
     "@fastify/helmet": "^13.0.1",
     "@fastify/swagger": "^9.4.0",
@@ -23,13 +25,17 @@
     "@polycast/contracts": "workspace:*",
     "@polycast/domain": "workspace:*",
     "fastify": "^5.2.0",
+    "fastify-plugin": "^6.0.0",
     "fastify-type-provider-zod": "^4.0.2",
+    "pg": "^8.23.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
     "@types/node": "^22.0.0",
+    "@types/pg": "^8.23.1",
     "eslint": "^9.17.0",
+    "pino": "^10.3.1",
     "tsx": "^4.19.2",
     "typescript": "~5.6.0",
     "typescript-eslint": "^8.19.0",

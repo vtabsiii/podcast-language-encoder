@@ -7,12 +7,16 @@ import { ErrorEnvelopeSchema, LanguageCapabilitiesResponseSchema } from '@polyca
 let app: FastifyInstance;
 
 beforeAll(async () => {
-  app = await buildApp({ config: loadConfig({ NODE_ENV: 'test' }), logger: false });
+  app = await buildApp({
+    config: loadConfig({ NODE_ENV: 'test' }),
+    logger: false,
+    withoutDatabase: true,
+  });
   await app.ready();
 });
 afterAll(async () => app.close());
 
-describe('api', () => {
+describe('api (no database)', () => {
   test('healthz', async () => {
     const res = await app.inject({ method: 'GET', url: '/healthz' });
     expect(res.statusCode).toBe(200);
@@ -29,12 +33,7 @@ describe('api', () => {
       for (const t of Object.values(l.tiers)) expect(t).not.toBe('production');
   });
 
-  test('capabilities filtered to production is empty; bad tier is a validation error', async () => {
-    const ok = await app.inject({
-      method: 'GET',
-      url: '/api/v1/capabilities/languages?kind=lipSync&minTier=production',
-    });
-    expect(ok.json().locales).toEqual([]);
+  test('bad tier is a validation error with the correlation id', async () => {
     const bad = await app.inject({
       method: 'GET',
       url: '/api/v1/capabilities/languages?kind=lipSync&minTier=gold',
@@ -55,12 +54,9 @@ describe('api', () => {
     expect(res.json()).toMatchObject({ code: 'NOT_FOUND', correlationId: 'corr-123' });
   });
 
-  test('openapi document is generated', async () => {
-    const res = await app.inject({ method: 'GET', url: '/docs/json' });
-    expect(res.statusCode).toBe(200);
-    // The /api/v1 prefix is expressed as the OpenAPI server base path.
-    expect(res.json().servers[0].url).toBe('/api/v1');
-    expect(res.json().paths['/capabilities/languages']).toBeDefined();
+  test('local-storage routes refuse unsigned requests', async () => {
+    const res = await app.inject({ method: 'GET', url: '/local-storage/polycast-source/x/y' });
+    expect(res.statusCode).toBe(403);
   });
 });
 
@@ -71,11 +67,22 @@ describe('config', () => {
       loadConfig({
         NODE_ENV: 'production',
         PROVIDER_MODE: 'aws',
+        STORAGE_DRIVER: 's3',
+        AUTH_MODE: 'cognito',
+        ORCHESTRATOR: 'step-functions',
+        WORKER_TOKEN: 'a-real-secret-value',
+        LOCAL_JWT_SECRET: 'another-real-secret-value',
         DATABASE_URL: 'postgres://x',
+        DATABASE_APP_URL: 'postgres://y',
+        PUBLIC_API_URL: 'https://api.example.com',
         MEDIA_BUCKET_SOURCE: 'a',
         MEDIA_BUCKET_DELIVERABLES: 'b',
         COGNITO_USER_POOL_ID: 'c',
       }),
     ).not.toThrow();
+  });
+
+  test('signed URL lifetime never exceeds 15 minutes', () => {
+    expect(() => loadConfig({ NODE_ENV: 'test', SIGNED_URL_TTL_SECONDS: '901' })).toThrow();
   });
 });

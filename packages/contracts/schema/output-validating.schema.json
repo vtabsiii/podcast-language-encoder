@@ -1,0 +1,128 @@
+{
+  "$ref": "#/definitions/output-validating",
+  "definitions": {
+    "output-validating": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "container": {
+              "type": "string"
+            },
+            "durationUs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "video": {
+              "type": "object",
+              "properties": {
+                "codec": {
+                  "type": "string"
+                },
+                "width": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "height": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "frameRate": {
+                  "type": "object",
+                  "properties": {
+                    "num": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "den": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    }
+                  },
+                  "required": [
+                    "num",
+                    "den"
+                  ],
+                  "additionalProperties": false
+                },
+                "variableFrameRate": {
+                  "type": "boolean"
+                },
+                "colorPrimaries": {
+                  "type": "string"
+                },
+                "transferCharacteristics": {
+                  "type": "string"
+                },
+                "hdr": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "codec",
+                "width",
+                "height",
+                "frameRate",
+                "variableFrameRate",
+                "hdr"
+              ],
+              "additionalProperties": false
+            },
+            "audio": {
+              "type": "object",
+              "properties": {
+                "codec": {
+                  "type": "string"
+                },
+                "sampleRate": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "channels": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "channelLayout": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "codec",
+                "sampleRate",
+                "channels",
+                "channelLayout"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "container",
+            "durationUs"
+          ],
+          "additionalProperties": false
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "byteSize": {
+          "type": "integer",
+          "exclusiveMinimum": 0
+        },
+        "source": {
+          "type": "string",
+          "pattern": "^(s3|local):\\/\\/[a-z0-9.-]+\\/.+$"
+        }
+      },
+      "required": [
+        "metadata",
+        "sha256",
+        "byteSize",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

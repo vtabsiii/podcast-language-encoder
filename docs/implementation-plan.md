@@ -1,7 +1,7 @@
 # Implementation plan
 
 Milestones are vertical: each one ends with something a producer can click through end to end,
-not a layer. Checkboxes reflect the state of this branch (`feat/polycast-scaffold`).
+not a layer. Checkboxes reflect the state of the repository after the M1 vertical slice.
 
 ## Next three milestones (summary)
 
@@ -30,34 +30,40 @@ Not in M0 (deferred to M1): stage handlers, orchestrator, auth, database, SSE, P
 
 ## M1 — First vertical slice (local only)
 
-- [ ] Auth: Cognito-compatible local JWT mock; `Membership` resolution middleware; role guard
-- [ ] Organization + Project create/list (`POST /api/v1/projects`), audit event `project.created`
-- [ ] Resumable multipart upload to MinIO: init, presign part, complete, abort; client resumes after reload (FR-001)
-- [ ] Quarantine bucket → validation via ffprobe worker; `asset.validated` / `asset.rejected` (FR-002)
-- [ ] Immutable source asset + proxy + waveform JSON (FR-003)
-- [ ] Mock analysis fixture (language, speakers, word timestamps, face tracks) → `analysis.completed` (FR-004..006 via mock adapters)
-- [ ] Capability languages endpoint returning tiers; wizard step 3 renders badges
-- [ ] Estimate endpoint (fixture pricing table) and budget check (FR-057 subset)
-- [ ] Idempotent `POST /api/v1/localization-jobs` with `Idempotency-Key`; fan-out to TargetJobs (FR-050, FR-051)
-- [ ] Local orchestrator adapter runs stage table; emits `target.stage.changed` over SSE (FR-052)
-- [ ] Mock QC flags exactly one segment → `target.review.required`; TargetJob in NEEDS_REVIEW (FR-040, FR-042)
-- [ ] Review studio: open flagged segment, regenerate translation (new TranslationVersion), approve (FR-053, FR-012)
-- [ ] Ready gate → PACKAGING → COMPLETE with fixture deliverables: MP4, SRT, transcript JSON, QC report, provenance manifest, `checksums.sha256` (FR-054, FR-041, FR-063)
-- [ ] Tenant isolation tests: cross-org IDOR on every route returns 404; RLS tests in Postgres (NFR-002)
-- [ ] Playwright E2E for the full slice plus axe checks on every screen (NFR-008)
-- [ ] Redaction test: no transcript text, media bytes or signed URL in any log line (A-17)
+- [x] Auth: Cognito-compatible local JWT (`apps/api/src/auth/jwt.ts`, `POST /auth/dev-login`); `Membership` resolution middleware and permission guard (`apps/api/src/auth/principal.ts`)
+- [x] Organization + Project create/list (`POST /api/v1/projects`), audit event `project.created` (`apps/api/src/services/projects.ts`, `audit.ts`)
+- [x] Resumable multipart upload: init, presign parts, complete, abort; storage port with `local` (filesystem + API-signed URLs) and `s3` (MinIO/S3) drivers; the browser client resumes after reload (FR-001) (`apps/api/src/services/uploads.ts`, `storage/`, `apps/web/lib/upload.ts`)
+- [x] Quarantine → validation via ffprobe in the worker; `upload.completed`, `asset.validated` / `asset.rejected` with typed reasons (FR-002) (`services/media-worker/polycast_worker/stages/validating.py`)
+- [x] Immutable source copy + proxy + waveform JSON (FR-003) (`stages/analyzing.py`)
+- [x] Mock analysis fixture (language, two speakers, word timestamps) → `analysis.completed` (FR-004..005 via mock adapters; face tracks remain M4)
+- [x] Capability languages endpoint returning tiers; wizard step 3 renders badges (`apps/web/app/projects/new/targets-step.tsx`)
+- [x] Estimate endpoint (fixture rate card in `packages/domain/src/estimate.ts`) and budget check BR-01 (FR-057 subset)
+- [x] Idempotent `POST /api/v1/localization-jobs` with `Idempotency-Key`; fan-out to TargetJobs with per-organization concurrency quota (FR-050, FR-051) (`apps/api/src/services/jobs.ts`, `idempotency.ts`, `packages/domain/src/quotas.ts`)
+- [x] Local orchestrator runs the stage table through worker tasks (claim / heartbeat / result) and emits `target.stage.changed` over SSE with `Last-Event-ID` replay (FR-052) (`apps/api/src/orchestrator/local.ts`, `routes/internal.ts`, `routes/events.ts`, `events/hub.ts`)
+- [x] Mock QC flags exactly one segment → `target.review.required`; TargetJob in NEEDS_REVIEW (FR-040, FR-042) (`stages/target_qa.py`, ready gate in `orchestrator/local.ts`)
+- [x] Review studio: open flagged segment, regenerate translation (new TranslationVersion with lineage, invalidation graph in `packages/domain/src/invalidation/graph.ts`), edit, resolve issues, approve (FR-053, FR-012) (`apps/api/src/services/review.ts`, `apps/web/.../review-studio.tsx`)
+- [x] Ready gate → PACKAGING → COMPLETE with fixture deliverables: media, SRT, VTT, transcript JSON, QC report, provenance manifest, `checksums.sha256` (FR-054, FR-041, FR-063) (`stages/packaging.py`, `apps/api/src/services/deliverables.ts`)
+- [x] Tenant isolation tests: cross-org IDOR on every route returns 404; RLS tests in Postgres (NFR-002) (`apps/api/test/tenant-isolation.test.ts`, `apps/api/migrations/0001_init.sql`)
+- [x] Playwright E2E for the full slice plus axe checks on every screen (NFR-008) (`apps/web/e2e/slice.spec.ts`)
+- [x] Redaction test: no transcript text, media bytes or signed URL in any log line (A-17) (`apps/api/test/redaction.test.ts`, `apps/api/src/logging.ts`)
 
-### Definition of done for M1 (spec §16)
+### Definition of done for M1 (spec §16) — status
 
-1. `pnpm dev` brings up web, api, media-worker, Postgres and MinIO with one command; `pnpm test` and `pnpm e2e` are green.
-2. A new user can sign in (mock), create a project, upload a 10-minute fixture video, and reach COMPLETE for one target locale without touching a CLI.
-3. Every state transition in the job state machine that the slice exercises is recorded as an event and visible in the processing view within 2 s.
-4. The flagged segment appears in the review studio with its QC issue; regenerating it creates a new TranslationVersion with lineage; approving clears the issue; READY is only reached after approval.
-5. Deliverables download with correct checksums; the provenance manifest validates against its contract schema.
-6. Cross-tenant tests prove that a second organization cannot read, list, or mutate any object of the first.
-7. Axe reports zero serious/critical violations on dashboard, wizard, processing view, review studio, deliverables.
-8. No log line in the test run contains forbidden keys (transcript, mediaUrl, signedUrl, embedding).
-9. OpenAPI document is generated from the Zod routes and the Python worker validates its inputs against the exported JSON Schema.
+1. `pnpm dev` brings up web, api, media-worker (turbo `dev` tasks) plus Postgres and MinIO (docker compose) with one command; `pnpm test` and `pnpm e2e` are green. ✔
+2. A new user signs in (local mock), creates a project, uploads a fixture (10-minute test video when ffmpeg is present), and reaches COMPLETE for one target locale without touching a CLI. ✔ (`apps/web/e2e/slice.spec.ts`)
+3. Every state transition the slice exercises is recorded as a `target.stage.changed` event in the outbox and streamed over SSE; the SSE test asserts delivery well inside 2 s. ✔
+4. The flagged segment appears in the review studio with its QC issue; regenerating creates a new TranslationVersion with `supersedesId` lineage; approving clears the issue; READY is only reached after approval. ✔ (`apps/api/test/slice.test.ts`, E2E)
+5. Deliverables download through 15-minute signed links with correct checksums; the provenance manifest validates against `packages/contracts/schema/provenance-manifest.schema.json`. ✔ (`apps/api/test/worker-integration.test.ts`)
+6. Cross-tenant tests prove a second organization cannot read, list, or mutate any object of the first, at the API and at the row-level-security layer. ✔
+7. Axe reports zero serious/critical violations on login, dashboard, wizard, processing view, review studio, deliverables, languages. ✔
+8. No log line in the test run contains forbidden keys (transcript, adaptedText, hint, url/uri, tokens, signatures). ✔
+9. OpenAPI is generated from the Zod routes (`apps/api/openapi.json`); the Python worker validates every task parameter and output against the exported JSON Schema. ✔ (`services/media-worker/tests/test_models_schema.py`)
+
+Known M1 limitations (honest): every provider is a `Mock*` adapter, so the "localized" media is the
+untranslated source and captions are pseudo-translations, which the provenance manifest states
+(`mock: true`). Lip sync is a mock stage that never applies. `FAILED` targets are terminal; only
+`RETRY_WAIT` targets can be kicked. Cognito verification, Step Functions and S3 event notifications
+arrive with M2.
 
 ## M2 — AWS dev path
 

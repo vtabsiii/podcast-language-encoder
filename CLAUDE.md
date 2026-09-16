@@ -22,11 +22,13 @@ the "legacy encoder" stack and is documented in `docs/aws-setup.md`.
 
 ```bash
 pnpm install
-pnpm build && pnpm lint && pnpm typecheck && pnpm test   # all Node packages
+cp .env.example .env
+pnpm build && pnpm lint && pnpm typecheck && pnpm test   # all Node packages; API tests need Postgres on DATABASE_URL
 pnpm synth                                                # CDK synth, no AWS credentials needed
-pnpm --filter @polycast/api dev                           # API on :4000 (/docs for Swagger UI)
+pnpm dev                                                  # docker compose + api :4000 + web :3000 + media worker
+pnpm e2e                                                  # Playwright + axe over the slice (Postgres, worker venv, Chromium)
+pnpm --filter @polycast/api dev                           # API on :4000 (/docs for Swagger UI); migrates on boot
 pnpm --filter @polycast/web dev                           # web on :3000
-docker compose up -d                                      # local Postgres + MinIO
 cd services/media-worker && pip install -e ".[dev]" && ruff check . && mypy polycast_worker && pytest
 ```
 
@@ -40,7 +42,11 @@ Run the full Node chain plus the Python chain before committing.
   No seed locale is `production`; promotion happens only via `docs/quality-benchmark.md`.
 - Every provider is behind an adapter interface. Mock adapters are named `Mock*` and register
   as tier `unavailable`. Production config fails closed (`apps/api/src/config.ts`, `services/media-worker/polycast_worker/config.py`).
-- Tenant scope comes from the authenticated principal, never from request bodies.
+- Tenant scope comes from the authenticated principal, never from request bodies. Every tenant
+  table is protected by Postgres row-level security; `Db.withTenant` is the only way to query it.
+- Workers never hold a database connection: they claim tasks and post results through
+  `/internal/v1` and read/write object storage only. Stage outputs are validated against
+  `packages/contracts` before persistence.
 - Never log transcripts, media, signed URLs, biometric data, tokens, or secrets.
 - Infrastructure only via CDK. S3 buckets keep `RemovalPolicy.RETAIN`.
 - GitHub Actions authenticate to AWS with OIDC only. Never add AWS keys as secrets.
@@ -105,6 +111,8 @@ Where this guidance conflicts with the project's own instructions, the project's
 - help_level (required): LOW, MEDIUM, or HIGH. While a user is building, you MUST ask the user: "How much guidance would you like from me? Low (I only flag security risks), medium (I ask a couple of clarifying questions if something seems off), or high (I explain what I'm doing, suggest alternatives, and flag best practices)."
 
 You CAN update this rule file to save a user's help_level.
+
+Saved help_level: LOW (victor@graysonsky.com, 2026-09-16).
 
 Constraints for each level:
 

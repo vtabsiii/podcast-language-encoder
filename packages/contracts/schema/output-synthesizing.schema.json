@@ -1,0 +1,65 @@
+{
+  "$ref": "#/definitions/output-synthesizing",
+  "definitions": {
+    "output-synthesizing": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "providerVersion": {
+          "type": "string"
+        },
+        "renders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "segmentId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "translationVersionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "voiceId": {
+                "type": "string"
+              },
+              "measuredDurationUs": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "audio": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^(s3|local):\\/\\/[a-z0-9.-]+\\/.+$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "segmentId",
+              "translationVersionId",
+              "voiceId",
+              "measuredDurationUs",
+              "audio"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "provider",
+        "providerVersion",
+        "renders"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

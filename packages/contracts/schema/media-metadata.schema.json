@@ -37,7 +37,10 @@
                   "exclusiveMinimum": 0
                 }
               },
-              "required": ["num", "den"],
+              "required": [
+                "num",
+                "den"
+              ],
               "additionalProperties": false
             },
             "variableFrameRate": {
@@ -53,7 +56,14 @@
               "type": "boolean"
             }
           },
-          "required": ["codec", "width", "height", "frameRate", "variableFrameRate", "hdr"],
+          "required": [
+            "codec",
+            "width",
+            "height",
+            "frameRate",
+            "variableFrameRate",
+            "hdr"
+          ],
           "additionalProperties": false
         },
         "audio": {
@@ -74,11 +84,19 @@
               "type": "string"
             }
           },
-          "required": ["codec", "sampleRate", "channels", "channelLayout"],
+          "required": [
+            "codec",
+            "sampleRate",
+            "channels",
+            "channelLayout"
+          ],
           "additionalProperties": false
         }
       },
-      "required": ["container", "durationUs"],
+      "required": [
+        "container",
+        "durationUs"
+      ],
       "additionalProperties": false
     }
   },
