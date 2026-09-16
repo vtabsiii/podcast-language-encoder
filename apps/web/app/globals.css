@@ -1,0 +1,14 @@
+html, body { margin: 0; background: var(--pc-color-bg); color: var(--pc-color-text); font-family: var(--pc-font-sans); }
+.skip-link { position: absolute; left: -999px; top: 0; background: var(--pc-color-surface); padding: var(--pc-space-2); }
+.skip-link:focus { left: var(--pc-space-2); z-index: 10; }
+.topbar { display: flex; align-items: center; gap: var(--pc-space-6); padding: var(--pc-space-3) var(--pc-space-6); border-bottom: 1px solid var(--pc-color-border); background: var(--pc-color-surface); }
+.brand { font-weight: 600; }
+.topbar nav { display: flex; gap: var(--pc-space-4); }
+.topbar a { color: var(--pc-color-text); text-decoration: none; }
+.topbar a:hover { text-decoration: underline; }
+.page { max-width: 1200px; margin: 0 auto; padding: var(--pc-space-8) var(--pc-space-6); }
+.card { background: var(--pc-color-surface); border: 1px solid var(--pc-color-border); border-radius: var(--pc-radius-lg); padding: var(--pc-space-6); box-shadow: var(--pc-shadow-sm); }
+.muted { color: var(--pc-color-text-muted); }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: start; padding: var(--pc-space-2) var(--pc-space-3); border-bottom: 1px solid var(--pc-color-border); }
+[dir='rtl'] { font-family: var(--pc-font-sans); }

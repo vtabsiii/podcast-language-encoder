@@ -1,15 +1,21 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install)",
-      "Bash(npm ci)",
-      "Bash(npm run build)",
-      "Bash(npm test:*)",
-      "Bash(npx jest:*)",
+      "Bash(pnpm install)",
+      "Bash(pnpm build)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm synth)",
+      "Bash(pnpm --filter:*)",
+      "Bash(pnpm format:*)",
       "Bash(npx cdk synth:*)",
       "Bash(npx cdk diff:*)",
       "Bash(npx cdk ls:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(pytest:*)",
+      "Bash(ruff:*)",
+      "Bash(mypy:*)"
     ]
   }
 }

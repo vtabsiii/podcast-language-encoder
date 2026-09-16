@@ -1,0 +1,187 @@
+{
+  "$ref": "#/definitions/domain-event",
+  "definitions": {
+    "domain-event": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "name": {
+              "type": "string",
+              "const": "target.stage.changed"
+            },
+            "occurredAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "correlationId": {
+              "type": "string"
+            },
+            "schemaVersion": {
+              "type": "number",
+              "const": 1
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "jobId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "targetJobId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "locale": {
+                  "type": "string"
+                },
+                "from": {
+                  "type": "string",
+                  "enum": [
+                    "UPLOADING",
+                    "QUARANTINED",
+                    "VALIDATING",
+                    "ANALYZING",
+                    "READY_TO_CONFIGURE",
+                    "QUEUED",
+                    "TRANSCRIBING",
+                    "SOURCE_QA",
+                    "TARGETS_FAN_OUT",
+                    "TRANSLATING",
+                    "SYNTHESIZING",
+                    "TIMING",
+                    "LIP_SYNCING",
+                    "MIXING",
+                    "ENCODING",
+                    "TARGET_QA",
+                    "NEEDS_REVIEW",
+                    "READY",
+                    "PACKAGING",
+                    "COMPLETE",
+                    "RETRY_WAIT",
+                    "FAILED",
+                    "CANCEL_REQUESTED",
+                    "CANCELLED"
+                  ]
+                },
+                "to": {
+                  "type": "string",
+                  "enum": [
+                    "UPLOADING",
+                    "QUARANTINED",
+                    "VALIDATING",
+                    "ANALYZING",
+                    "READY_TO_CONFIGURE",
+                    "QUEUED",
+                    "TRANSCRIBING",
+                    "SOURCE_QA",
+                    "TARGETS_FAN_OUT",
+                    "TRANSLATING",
+                    "SYNTHESIZING",
+                    "TIMING",
+                    "LIP_SYNCING",
+                    "MIXING",
+                    "ENCODING",
+                    "TARGET_QA",
+                    "NEEDS_REVIEW",
+                    "READY",
+                    "PACKAGING",
+                    "COMPLETE",
+                    "RETRY_WAIT",
+                    "FAILED",
+                    "CANCEL_REQUESTED",
+                    "CANCELLED"
+                  ]
+                },
+                "attempt": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "progress": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["jobId", "targetJobId", "locale", "from", "to", "attempt", "progress"],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "eventId",
+            "name",
+            "occurredAt",
+            "organizationId",
+            "correlationId",
+            "schemaVersion",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "name": {
+              "type": "string",
+              "enum": [
+                "project.created",
+                "upload.completed",
+                "asset.validated",
+                "analysis.completed",
+                "job.created",
+                "target.stage.changed",
+                "target.review.required",
+                "target.ready",
+                "deliverable.packaged",
+                "consent.revoked",
+                "audit.recorded"
+              ]
+            },
+            "occurredAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "correlationId": {
+              "type": "string"
+            },
+            "schemaVersion": {
+              "type": "number",
+              "const": 1
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          },
+          "required": [
+            "eventId",
+            "name",
+            "occurredAt",
+            "organizationId",
+            "correlationId",
+            "schemaVersion",
+            "payload"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

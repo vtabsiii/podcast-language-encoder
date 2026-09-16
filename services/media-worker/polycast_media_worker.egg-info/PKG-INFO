@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: polycast-media-worker
+Version: 0.1.0
+Summary: Polycast Studio media-plane worker: probe/validate, proxy, mix, encode, QC, package. ML inference stays behind provider adapters.
+Requires-Python: >=3.11
+Requires-Dist: pydantic>=2.10
+Requires-Dist: jsonschema>=4.23
+Provides-Extra: dev
+Requires-Dist: pytest>=8.3; extra == "dev"
+Requires-Dist: pytest-cov>=6.0; extra == "dev"
+Requires-Dist: ruff>=0.8; extra == "dev"
+Requires-Dist: mypy>=1.13; extra == "dev"

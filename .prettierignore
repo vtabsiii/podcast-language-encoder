@@ -1,0 +1,8 @@
+node_modules
+dist
+.next
+cdk.out
+pnpm-lock.yaml
+**/*.md
+apps/api/openapi.json
+packages/contracts/schema

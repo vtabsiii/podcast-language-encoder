@@ -9,21 +9,46 @@ permissions:
   contents: read
 
 jobs:
-  build-test-synth:
-    name: Build, test, synth
+  node:
+    name: Lint, typecheck, test, build (Node)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-
-      - run: npm ci
-      - run: npm run build
-      - run: npm test -- --ci
-
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm build
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
       # Synth needs no AWS credentials: stacks are environment-agnostic until deploy.
-      - name: cdk synth
-        run: npx cdk synth --quiet
+      - run: pnpm synth
+      - name: Upload OpenAPI document
+        run: pnpm --filter @polycast/api openapi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: apps/api/openapi.json
+
+  python:
+    name: Lint, typecheck, test (media-worker)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+    defaults:
+      run:
+        working-directory: services/media-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: mypy polycast_worker
+      - run: pytest -q
