@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import type { ProjectDetailResponse } from '@polycast/contracts';
 import type { JobListResponse } from '@/lib/contract-types';
 import { apiGet } from '@/lib/api';
+import { redirectIfUnauthenticated } from '@/lib/auth-redirect';
 import { ApiError, describeError } from '@/lib/errors';
 import { ProcessingView } from './processing-view';
 
@@ -18,6 +19,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     detail = await apiGet<ProjectDetailResponse>(`/api/v1/projects/${id}`);
     jobs = await apiGet<JobListResponse>(`/api/v1/projects/${id}/jobs`).catch(() => ({ jobs: [] }));
   } catch (e) {
+    await redirectIfUnauthenticated(e);
     if (e instanceof ApiError && e.status === 404) notFound();
     return (
       <section aria-labelledby="project-error-heading">

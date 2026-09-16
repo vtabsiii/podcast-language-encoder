@@ -3,7 +3,14 @@ name: Deploy Polycast (manual)
 # MANUAL ONLY. Deploys the seven Polycast* stacks (network, storage, Aurora, Cognito, API,
 # orchestration, web) to the dev account. These create PAID resources (NAT gateway, Fargate
 # tasks, Aurora Serverless v2, CloudFront); see docs/aws-setup.md "Polycast stacks (M2, manual
-# deploy only)" for cost, prerequisites (images pushed to ECR) and the migration step.
+# deploy only)" for cost and what happens on the first run.
+#
+# The run is self-contained: `cdk deploy` builds the three service images on this runner and
+# publishes them as CDK assets, the PolycastApi stack runs the database migration task through
+# a custom resource before the API service starts, and the web origin (CloudFront domain) is
+# resolved from the deployed PolycastWeb stack so CORS, Cognito callbacks and the sign-in
+# redirect all point at it. The very first run cannot know the domain in advance, so it
+# deploys twice: once with the default origin, then again with the real one.
 #
 # Never add a push/pull_request trigger here. The legacy encoder keeps deploying from
 # deploy.yml on push to main; the Polycast stacks are deployed only by a human running this
@@ -16,10 +23,15 @@ on:
         description: 'Type "deploy-polycast" to confirm you want to create/update paid resources'
         required: true
         type: string
-      imageTag:
-        description: 'ECR image tag for polycast/api, polycast/web and polycast/media-worker'
+      webOrigin:
+        description: 'Public web origin (https://<distribution>.cloudfront.net). Leave empty to resolve it from the deployed PolycastWeb stack.'
         required: false
-        default: latest
+        default: ''
+        type: string
+      sesFromAddress:
+        description: 'Verified SES sender for worker email notifications (optional; in-app only when empty)'
+        required: false
+        default: ''
         type: string
 
 concurrency:
@@ -34,10 +46,11 @@ jobs:
   deploy:
     name: cdk deploy Polycast*
     runs-on: ubuntu-latest
+    timeout-minutes: 180
     environment: production
     env:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-      POLYCAST_IMAGE_TAG: ${{ inputs.imageTag || 'latest' }}
+      SES_FROM_ADDRESS: ${{ inputs.sesFromAddress }}
     steps:
       - name: Check confirmation
         if: ${{ inputs.confirm != 'deploy-polycast' }}
@@ -62,18 +75,75 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Resolve web origin
+        id: origin
+        env:
+          INPUT_WEB_ORIGIN: ${{ inputs.webOrigin }}
+        run: |
+          set -euo pipefail
+          origin="$INPUT_WEB_ORIGIN"
+          if [ -z "$origin" ]; then
+            # The deploy role may only assume the CDK bootstrap roles; the lookup role reads stacks.
+            account="$(aws sts get-caller-identity --query Account --output text)"
+            lookup_role="arn:aws:iam::${account}:role/cdk-hnb659fds-lookup-role-${account}-${AWS_REGION}"
+            creds="$(aws sts assume-role --role-arn "$lookup_role" --role-session-name polycast-origin --query Credentials --output json)"
+            domain="$(
+              AWS_ACCESS_KEY_ID="$(echo "$creds" | jq -r .AccessKeyId)" \
+              AWS_SECRET_ACCESS_KEY="$(echo "$creds" | jq -r .SecretAccessKey)" \
+              AWS_SESSION_TOKEN="$(echo "$creds" | jq -r .SessionToken)" \
+              aws cloudformation describe-stacks --stack-name PolycastWeb \
+                --query "Stacks[0].Outputs[?OutputKey=='DistributionDomainName'].OutputValue" \
+                --output text 2>/dev/null || true
+            )"
+            if [ -n "$domain" ] && [ "$domain" != "None" ]; then origin="https://${domain}"; fi
+          fi
+          echo "origin=${origin}" >> "$GITHUB_OUTPUT"
+          if [ -n "$origin" ]; then
+            echo "Web origin: $origin"
+          else
+            echo "PolycastWeb is not deployed yet: first pass uses the default origin, second pass sets the real one."
+          fi
+
       - name: cdk diff
         working-directory: infra
-        run: npx cdk diff 'Polycast*' -c polycastImageTag="$POLYCAST_IMAGE_TAG" || true
+        env:
+          WEB_ORIGIN: ${{ steps.origin.outputs.origin }}
+        run: >-
+          npx cdk diff 'Polycast*'
+          ${WEB_ORIGIN:+-c polycastWebOrigins="$WEB_ORIGIN"}
+          ${SES_FROM_ADDRESS:+-c polycastSesFromAddress="$SES_FROM_ADDRESS"}
+          || true
 
       - name: cdk deploy
         working-directory: infra
+        env:
+          WEB_ORIGIN: ${{ steps.origin.outputs.origin }}
         run: >-
           npx cdk deploy 'Polycast*'
           --require-approval never
-          -c polycastImageTag="$POLYCAST_IMAGE_TAG"
+          --concurrency 3
+          ${WEB_ORIGIN:+-c polycastWebOrigins="$WEB_ORIGIN"}
+          ${SES_FROM_ADDRESS:+-c polycastSesFromAddress="$SES_FROM_ADDRESS"}
           --outputs-file cdk-outputs.json
+
+      - name: cdk deploy (second pass with the CloudFront origin)
+        if: ${{ steps.origin.outputs.origin == '' }}
+        working-directory: infra
+        run: |
+          set -euo pipefail
+          domain="$(jq -r '.PolycastWeb.DistributionDomainName' cdk-outputs.json)"
+          test -n "$domain" && [ "$domain" != "null" ]
+          echo "Web origin: https://${domain}"
+          npx cdk deploy 'Polycast*' --require-approval never --concurrency 3 \
+            -c polycastWebOrigins="https://${domain}" \
+            ${SES_FROM_ADDRESS:+-c polycastSesFromAddress="$SES_FROM_ADDRESS"} \
+            --outputs-file cdk-outputs.json
 
       - name: Show stack outputs
         working-directory: infra
-        run: cat cdk-outputs.json
+        run: |
+          cat cdk-outputs.json
+          echo "## Polycast Studio" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Web: https://$(jq -r '.PolycastWeb.DistributionDomainName' cdk-outputs.json)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- User pool: $(jq -r '.PolycastAuth.UserPoolId' cdk-outputs.json)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Hosted UI: $(jq -r '.PolycastAuth.HostedUiUrl' cdk-outputs.json)" >> "$GITHUB_STEP_SUMMARY"

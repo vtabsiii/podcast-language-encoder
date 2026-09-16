@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # apps/web (Next.js standalone output) on Node 22. Build from the repository root:
 #   docker build -f apps/web/Dockerfile -t polycast/web:<tag> .
-# Not built in CI (docs/aws-setup.md "Polycast stacks"); pushed manually to ECR polycast/web.
+# Built and published by `cdk deploy` as a Docker image asset (docs/aws-setup.md "Polycast stacks").
 
 FROM node:22-slim AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH CI=1 NEXT_TELEMETRY_DISABLED=1

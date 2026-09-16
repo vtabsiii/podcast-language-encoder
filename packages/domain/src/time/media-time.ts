@@ -65,8 +65,9 @@ export function duration(r: TimeRange): Microseconds {
   return micros(r.end - r.start);
 }
 
+/** True when the half-open ranges share at least 1 µs; an empty range overlaps nothing. */
 export function overlaps(a: TimeRange, b: TimeRange): boolean {
-  return a.start < b.end && b.start < a.end;
+  return Math.max(a.start, b.start) < Math.min(a.end, b.end);
 }
 
 /** Overlap in µs (0 when disjoint). */

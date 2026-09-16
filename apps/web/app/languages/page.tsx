@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { LanguageCapabilitiesResponse } from '@polycast/contracts';
 import { StatusBadge, Table, toneForTier } from '@polycast/ui';
 import { apiGet } from '@/lib/api';
+import { redirectIfUnauthenticated } from '@/lib/auth-redirect';
 import { describeError } from '@/lib/errors';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,7 @@ export default async function LanguagesPage() {
   try {
     data = await apiGet<LanguageCapabilitiesResponse>('/api/v1/capabilities/languages');
   } catch (e) {
+    await redirectIfUnauthenticated(e);
     error = describeError(e);
   }
 

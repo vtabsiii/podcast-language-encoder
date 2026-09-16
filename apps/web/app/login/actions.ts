@@ -4,7 +4,10 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { DevLoginRequestSchema, type DevLoginResponse } from '@polycast/contracts';
 import { apiFetch } from '@/lib/api';
+import { loadWho, organizationExpiry, setOrganization } from '@/lib/auth-session';
+import { loginUrl } from '@/lib/auth-urls';
 import { describeError } from '@/lib/errors';
+import { safeNext } from '@/lib/safe-next';
 import { ORG_COOKIE, SESSION_COOKIE, WHO_COOKIE, type Who } from '@/lib/session';
 
 export interface LoginState {
@@ -66,4 +69,28 @@ export async function devLogin(_prev: LoginState, form: FormData): Promise<Login
 
   const next = String(form.get('next') ?? '/');
   redirect(next.startsWith('/') && !next.startsWith('//') ? next : '/');
+}
+
+/**
+ * Re-scopes an existing session to another organization the principal belongs to. Membership
+ * is checked by the API (`/me` with the requested scope), never trusted from the form.
+ */
+export async function switchOrganization(_prev: LoginState, form: FormData): Promise<LoginState> {
+  const next = safeNext(form.get('next'));
+  const organizationId = String(form.get('organizationId') ?? '').trim();
+  if (!organizationId) {
+    return { error: 'Choose an organization.', fieldErrors: { organizationId: 'Required.' } };
+  }
+  const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
+  if (!token) redirect(loginUrl(next));
+
+  let who: Who;
+  try {
+    who = await loadWho(token, organizationId);
+  } catch (e) {
+    return { error: describeError(e), fieldErrors: { organizationId: 'Not available.' } };
+  }
+  setOrganization(jar, who, organizationExpiry(token));
+  redirect(next);
 }

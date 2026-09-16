@@ -2,7 +2,7 @@ import { Template, Match } from 'aws-cdk-lib/assertions';
 import { buildPolycastApp } from './polycast-fixture';
 
 describe('PolycastApiStack', () => {
-  const { api } = buildPolycastApp({ webOrigins: ['https://app.example.test'], imageTag: 'v1' });
+  const { api } = buildPolycastApp({ webOrigins: ['https://app.example.test'] });
   const template = Template.fromStack(api);
 
   test('internal ALB with a 300 s idle timeout and a /healthz target group', () => {
@@ -51,7 +51,10 @@ describe('PolycastApiStack', () => {
       ContainerDefinitions: [
         Match.objectLike({
           Name: 'api',
-          Image: Match.objectLike({ 'Fn::Join': ['', Match.arrayWith([':v1'])] }),
+          // CDK Docker image asset: <account>.dkr.ecr.<region>/cdk-<qualifier>-container-assets-…:<hash>
+          Image: Match.objectLike({
+            'Fn::Sub': Match.stringLikeRegexp('container-assets-.*:[0-9a-f]{64}$'),
+          }),
           PortMappings: [Match.objectLike({ ContainerPort: 4000 })],
         }),
       ],
@@ -129,13 +132,49 @@ describe('PolycastApiStack', () => {
     template.hasOutput('MigrateSecurityGroupId', {});
   });
 
-  test('ECR repository polycast/api scans on push and is retained', () => {
-    template.hasResource('AWS::ECR::Repository', {
-      Properties: Match.objectLike({
-        RepositoryName: 'polycast/api',
-        ImageScanningConfiguration: { ScanOnPush: true },
+  test('image is a CDK asset built from apps/api/Dockerfile; no application ECR repository', () => {
+    template.resourceCountIs('AWS::ECR::Repository', 0);
+    const assets = Object.values(
+      Template.fromStack(api).toJSON().Resources as Record<string, { Type: string }>,
+    ).filter((r) => r.Type === 'AWS::ECR::Repository');
+    expect(assets).toHaveLength(0);
+    template.hasResourceProperties('AWS::ECS::TaskDefinition', {
+      ContainerDefinitions: [
+        Match.objectLike({
+          Name: 'api',
+          Environment: Match.arrayWith([
+            { Name: 'DB_SSL', Value: 'require' },
+            { Name: 'DB_SSL_ROOT_CERT', Value: '/etc/ssl/certs/aws-rds-global-bundle.pem' },
+          ]),
+        }),
+      ],
+    });
+  });
+
+  test('migration custom resource runs the migrate task before the API service', () => {
+    template.hasResourceProperties('Custom::PolycastMigration', {
+      ContainerName: 'migrate',
+      TaskDefinitionArn: Match.objectLike({ Ref: Match.stringLikeRegexp('MigrateTask') }),
+      SecurityGroupIds: [Match.objectLike({ 'Fn::GetAtt': Match.arrayWith(['GroupId']) })],
+    });
+    const services = template.findResources('AWS::ECS::Service', {
+      Properties: { ServiceName: 'polycast-api' },
+    });
+    const service = Object.values(services)[0] as { DependsOn?: string[] };
+    expect(service.DependsOn).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^Migration[0-9A-F]*$/)]),
+    );
+    // Only the migrate task family may be started, only on the Polycast cluster.
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: 'ecs:RunTask',
+            Resource: Match.objectLike({ Ref: Match.stringLikeRegexp('MigrateTask') }),
+            Condition: { ArnEquals: { 'ecs:cluster': Match.anyValue() } },
+          }),
+        ]),
       }),
-      DeletionPolicy: 'Retain',
     });
   });
 

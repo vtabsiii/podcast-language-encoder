@@ -1,4 +1,8 @@
 import * as cdk from 'aws-cdk-lib';
+import * as ecrAssets from 'aws-cdk-lib/aws-ecr-assets';
+import * as ecs from 'aws-cdk-lib/aws-ecs';
+import { Construct } from 'constructs';
+import * as path from 'path';
 
 /**
  * Names shared between Polycast stacks that must not reference each other directly.
@@ -60,4 +64,36 @@ export function polycastEventBusArn(stack: cdk.Stack): string {
     resourceName: POLYCAST_EVENT_BUS_NAME,
     arnFormat: cdk.ArnFormat.SLASH_RESOURCE_NAME,
   });
+}
+
+/** Repository root: the Docker build context of every Polycast image. */
+export const POLYCAST_REPO_ROOT = path.resolve(__dirname, '..', '..');
+
+/**
+ * Paths that never influence an image and are left out of its asset hash, so a docs or
+ * infra change does not rebuild and redeploy the three services. `.dockerignore` at the
+ * repository root already drops node_modules, build output and secrets.
+ */
+export const POLYCAST_IMAGE_EXCLUDES = ['.github', 'docs', 'infra', '**/*.md'];
+
+/**
+ * A service image built from one of the repository's Dockerfiles and published by
+ * `cdk deploy` into the CDK bootstrap ECR repository (the GitHub OIDC role can already assume
+ * the bootstrap image-publishing role, so no application-owned registry or manual
+ * `docker push` is needed). Images are built for linux/amd64 to match the Fargate tasks.
+ */
+export function polycastContainerImage(
+  scope: Construct,
+  id: string,
+  dockerfile: 'apps/api/Dockerfile' | 'apps/web/Dockerfile' | 'services/media-worker/Dockerfile',
+): ecs.ContainerImage {
+  return ecs.ContainerImage.fromDockerImageAsset(
+    new ecrAssets.DockerImageAsset(scope, id, {
+      directory: POLYCAST_REPO_ROOT,
+      file: dockerfile,
+      platform: ecrAssets.Platform.LINUX_AMD64,
+      exclude: POLYCAST_IMAGE_EXCLUDES,
+      ignoreMode: cdk.IgnoreMode.DOCKER,
+    }),
+  );
 }

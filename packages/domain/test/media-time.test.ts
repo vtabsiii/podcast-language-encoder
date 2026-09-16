@@ -52,6 +52,14 @@ describe('media time', () => {
     );
   });
 
+  test('an empty range overlaps nothing, even inside another range', () => {
+    const outer = range(micros(0), micros(13));
+    const empty = range(micros(12), micros(12));
+    expect(overlaps(outer, empty)).toBe(false);
+    expect(overlaps(empty, outer)).toBe(false);
+    expect(overlapDuration(outer, empty)).toBe(0);
+  });
+
   test('caption timestamps', () => {
     expect(toSrtTimestamp(fromMilliseconds(3_723_456))).toBe('01:02:03,456');
     expect(toVttTimestamp(fromMilliseconds(3_723_456))).toBe('01:02:03.456');

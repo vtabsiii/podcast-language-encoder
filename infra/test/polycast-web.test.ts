@@ -60,11 +60,18 @@ describe('PolycastWebStack', () => {
               Name: 'API_BASE_URL',
               Value: Match.objectLike({ 'Fn::Join': ['', Match.arrayWith(['http://'])] }),
             },
+            { Name: 'AUTH_MODE', Value: 'cognito' },
+            Match.objectLike({ Name: 'COGNITO_CLIENT_ID' }),
+            Match.objectLike({ Name: 'COGNITO_HOSTED_UI_URL' }),
+            { Name: 'WEB_ORIGIN', Value: 'https://app.example.test' },
           ]),
+          Image: Match.objectLike({
+            'Fn::Sub': Match.stringLikeRegexp('container-assets-.*:[0-9a-f]{64}$'),
+          }),
         }),
       ],
     });
-    template.hasResourceProperties('AWS::ECR::Repository', { RepositoryName: 'polycast/web' });
+    template.resourceCountIs('AWS::ECR::Repository', 0);
   });
 
   test('web tier gets an ingress rule on the API ALB security group, placed in this stack', () => {
@@ -77,7 +84,7 @@ describe('PolycastWebStack', () => {
     });
   });
 
-  test('CloudFront: HTTPS-only viewers, no caching for dynamic paths, static paths from S3 via OAC', () => {
+  test('CloudFront: HTTPS-only viewers, no caching for dynamic paths, cached /_next/static', () => {
     template.resourceCountIs('AWS::CloudFront::Distribution', 1);
     template.hasResourceProperties('AWS::CloudFront::Distribution', {
       DistributionConfig: Match.objectLike({
@@ -96,22 +103,20 @@ describe('PolycastWebStack', () => {
             ViewerProtocolPolicy: 'https-only',
             CachePolicyId: '658327ea-f89d-4fab-a63d-7e88639e58f6', // CACHING_OPTIMIZED
           }),
-          Match.objectLike({ PathPattern: '/assets/*' }),
           Match.objectLike({
             PathPattern: '/api/*',
             CachePolicyId: '4135ea2d-6df8-44a3-9df3-4b5a84be39ad',
           }),
         ]),
-        Origins: Match.arrayWith([
+        Origins: [
           Match.objectLike({
             CustomOriginConfig: Match.objectLike({ OriginProtocolPolicy: 'http-only' }),
             OriginCustomHeaders: [Match.objectLike({ HeaderName: 'X-Origin-Verify' })],
           }),
-          Match.objectLike({ OriginAccessControlId: Match.anyValue() }),
-        ]),
+        ],
       }),
     });
-    template.resourceCountIs('AWS::CloudFront::OriginAccessControl', 1);
+    template.resourceCountIs('AWS::CloudFront::OriginAccessControl', 0);
     const paths = template
       .findResources('AWS::CloudFront::Distribution')
       [
@@ -141,13 +146,8 @@ describe('PolycastWebStack', () => {
     });
   });
 
-  test('static assets bucket is retained, private and TLS-only', () => {
-    template.hasResource('AWS::S3::Bucket', {
-      Properties: Match.objectLike({
-        PublicAccessBlockConfiguration: Match.objectLike({ BlockPublicAcls: true }),
-      }),
-      DeletionPolicy: 'Retain',
-    });
+  test('no buckets of its own; the distribution domain is exported for the web origin', () => {
+    template.resourceCountIs('AWS::S3::Bucket', 0);
     template.hasOutput('DistributionDomainName', {});
   });
 });
@@ -161,7 +161,7 @@ describe('PolycastWebStack with a CloudFront public key', () => {
       PublicKeyConfig: Match.objectLike({ EncodedKey: TEST_PUBLIC_KEY_PEM }),
     });
     template.resourceCountIs('AWS::CloudFront::KeyGroup', 1);
-    template.resourceCountIs('AWS::CloudFront::OriginAccessControl', 2);
+    template.resourceCountIs('AWS::CloudFront::OriginAccessControl', 1);
     template.hasResourceProperties('AWS::CloudFront::Distribution', {
       DistributionConfig: Match.objectLike({
         CacheBehaviors: Match.arrayWith([

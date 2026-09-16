@@ -2,16 +2,19 @@ import * as cdk from 'aws-cdk-lib';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
-import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as kms from 'aws-cdk-lib/aws-kms';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as cr from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
+import * as path from 'path';
 import {
   POLYCAST_CHILD_STATE_MACHINE_NAME,
   POLYCAST_EVENT_BUS_NAME,
@@ -19,6 +22,7 @@ import {
   polycastEventBusArn,
   polycastExecutionArnPattern,
   polycastStateMachineArn,
+  polycastContainerImage,
   polycastStateMachineArnPattern,
   tagPolycastStack,
 } from './polycast-common';
@@ -44,8 +48,6 @@ export interface PolycastApiStackProps extends cdk.StackProps {
   userPoolClientId: string;
   /** Browser origins for CORS_ORIGINS. */
   webOrigins: string[];
-  /** ECR image tag to run; defaults to `latest`. */
-  imageTag?: string;
   /** PUBLIC_API_URL for the API; defaults to the internal ALB URL (only the web tier and workers call it). */
   publicApiUrl?: string;
 }
@@ -61,12 +63,16 @@ export interface PolycastApiStackProps extends cdk.StackProps {
  * Runtime configuration matches `apps/api/src/config.ts` production fail-closed rules. Database
  * credentials are injected field by field from Secrets Manager (`DB_*`), never as URLs.
  *
+ * The image is a CDK Docker image asset built from `apps/api/Dockerfile` and published by
+ * `cdk deploy`; no application-owned ECR repository exists (docs/aws-setup.md).
+ *
  * `MigrateTask` is a separate task definition running `node dist/db/migrate-cli.js` with the
- * owner secret; run it before each deploy that ships a migration (docs/aws-setup.md).
+ * owner secret. The `Migration` custom resource runs it during every deploy whose task
+ * definition changed and blocks the API service until it exits 0, so the schema is always
+ * ahead of the code that serves it (docs/aws-setup.md).
  */
 export class PolycastApiStack extends cdk.Stack {
   public readonly cluster: ecs.Cluster;
-  public readonly repository: ecr.Repository;
   public readonly service: ecs.FargateService;
   public readonly serviceSecurityGroup: ec2.SecurityGroup;
   public readonly loadBalancer: elbv2.ApplicationLoadBalancer;
@@ -81,20 +87,10 @@ export class PolycastApiStack extends cdk.Stack {
     super(scope, id, props);
     tagPolycastStack(this, 'api');
 
-    const imageTag = props.imageTag ?? 'latest';
-
     this.cluster = new ecs.Cluster(this, 'Cluster', {
       vpc: props.vpc,
       clusterName: 'polycast',
       containerInsightsV2: ecs.ContainerInsights.ENABLED,
-    });
-
-    this.repository = new ecr.Repository(this, 'Repository', {
-      repositoryName: 'polycast/api',
-      imageScanOnPush: true,
-      imageTagMutability: ecr.TagMutability.MUTABLE,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      lifecycleRules: [{ description: 'keep the last 20 images', maxImageCount: 20 }],
     });
 
     // ------------------------------------------------------------- secrets
@@ -149,6 +145,9 @@ export class PolycastApiStack extends cdk.Stack {
       DB_PORT: cdk.Tokenization.stringifyNumber(props.database.clusterEndpoint.port),
       DB_NAME: 'polycast',
       DB_SSL: 'require',
+      // Amazon RDS certificate bundle baked into the image (apps/api/Dockerfile): the client
+      // verifies the Aurora certificate chain and host name (sslmode=verify-full).
+      DB_SSL_ROOT_CERT: '/etc/ssl/certs/aws-rds-global-bundle.pem',
       // Orchestration resources are addressed by name so this stack never depends on them.
       EVENT_BUS_NAME: POLYCAST_EVENT_BUS_NAME,
       SFN_PARENT_STATE_MACHINE_ARN: polycastStateMachineArn(
@@ -165,7 +164,7 @@ export class PolycastApiStack extends cdk.Stack {
       DB_APP_USER: ecs.Secret.fromSecretsManager(props.dbAppSecret, 'username'),
       DB_APP_PASSWORD: ecs.Secret.fromSecretsManager(props.dbAppSecret, 'password'),
     };
-    const image = ecs.ContainerImage.fromEcrRepository(this.repository, imageTag);
+    const image = polycastContainerImage(this, 'Image', 'apps/api/Dockerfile');
     const logGroup = new logs.LogGroup(this, 'ApiLogs', {
       retention: logs.RetentionDays.ONE_MONTH,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -314,6 +313,79 @@ export class PolycastApiStack extends cdk.Stack {
       logging: ecs.LogDrivers.awsLogs({ logGroup, streamPrefix: 'migrate' }),
     });
 
+    // Runs the migration task on every deploy that changes it and blocks the API service until
+    // it has exited 0 (the task definition ARN carries the revision, so a new image or a new
+    // environment variable re-runs it). Failures roll the stack back.
+    const migrationFn = (name: string, handler: 'onEvent' | 'isComplete') =>
+      new NodejsFunction(this, name, {
+        entry: path.join(__dirname, '..', 'lambda', 'run-migration', 'index.ts'),
+        handler,
+        runtime: lambda.Runtime.NODEJS_22_X,
+        architecture: lambda.Architecture.ARM_64,
+        memorySize: 256,
+        timeout: cdk.Duration.seconds(30),
+        description: `Polycast: ${handler} for the database migration task`,
+        logGroup: new logs.LogGroup(this, `${name}Logs`, {
+          retention: logs.RetentionDays.ONE_MONTH,
+          removalPolicy: cdk.RemovalPolicy.DESTROY,
+        }),
+        bundling: { minify: true, sourceMap: false, target: 'node22' },
+      });
+    const migrationStart = migrationFn('MigrationStartFn', 'onEvent');
+    const migrationPoll = migrationFn('MigrationPollFn', 'isComplete');
+    for (const fn of [migrationStart, migrationPoll]) {
+      fn.addToRolePolicy(
+        new iam.PolicyStatement({
+          sid: 'RunMigrationTask',
+          actions: ['ecs:RunTask'],
+          resources: [this.migrateTaskDefinition.taskDefinitionArn],
+          conditions: { ArnEquals: { 'ecs:cluster': this.cluster.clusterArn } },
+        }),
+      );
+      fn.addToRolePolicy(
+        new iam.PolicyStatement({
+          sid: 'DescribeMigrationTask',
+          actions: ['ecs:DescribeTasks'],
+          resources: ['*'],
+          conditions: { ArnEquals: { 'ecs:cluster': this.cluster.clusterArn } },
+        }),
+      );
+      fn.addToRolePolicy(
+        new iam.PolicyStatement({
+          sid: 'PassMigrationRoles',
+          actions: ['iam:PassRole'],
+          resources: [taskRole.roleArn, this.migrateTaskDefinition.obtainExecutionRole().roleArn],
+          conditions: { StringEquals: { 'iam:PassedToService': 'ecs-tasks.amazonaws.com' } },
+        }),
+      );
+    }
+    const migrationProvider = new cr.Provider(this, 'MigrationProvider', {
+      onEventHandler: migrationStart,
+      isCompleteHandler: migrationPoll,
+      queryInterval: cdk.Duration.seconds(15),
+      totalTimeout: cdk.Duration.minutes(30),
+      logGroup: new logs.LogGroup(this, 'MigrationProviderLogs', {
+        retention: logs.RetentionDays.ONE_MONTH,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+    const migration = new cdk.CustomResource(this, 'Migration', {
+      serviceToken: migrationProvider.serviceToken,
+      resourceType: 'Custom::PolycastMigration',
+      properties: {
+        ClusterArn: this.cluster.clusterArn,
+        TaskDefinitionArn: this.migrateTaskDefinition.taskDefinitionArn,
+        SubnetIds: props.vpc.selectSubnets({ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS })
+          .subnetIds,
+        SecurityGroupIds: [this.migrateSecurityGroup.securityGroupId],
+        ContainerName: 'migrate',
+      },
+    });
+    // The ingress rule to the database lives under the migrate security group (remoteRule);
+    // depending on the group covers it. The service waits for the schema.
+    migration.node.addDependency(this.migrateSecurityGroup);
+    this.service.node.addDependency(migration);
+
     // ---------------------------------------------------------------- alarms
     const period = cdk.Duration.minutes(1);
     const requests = this.loadBalancer.metrics.requestCount({ period, statistic: 'Sum' });
@@ -357,12 +429,12 @@ export class PolycastApiStack extends cdk.Stack {
 
     // -------------------------------------------------------------- outputs
     new cdk.CfnOutput(this, 'ApiInternalUrl', { value: this.apiUrl });
-    new cdk.CfnOutput(this, 'ApiRepositoryUri', { value: this.repository.repositoryUri });
     new cdk.CfnOutput(this, 'ClusterName', { value: this.cluster.clusterName });
     new cdk.CfnOutput(this, 'WorkerTokenSecretArn', { value: this.workerTokenSecret.secretArn });
     new cdk.CfnOutput(this, 'MigrateTaskDefinitionArn', {
       value: this.migrateTaskDefinition.taskDefinitionArn,
-      description: 'aws ecs run-task --task-definition <this> (see docs/aws-setup.md)',
+      description:
+        'Run by the Migration custom resource on each deploy; also usable with aws ecs run-task (docs/aws-setup.md)',
     });
     new cdk.CfnOutput(this, 'MigrateSecurityGroupId', {
       value: this.migrateSecurityGroup.securityGroupId,

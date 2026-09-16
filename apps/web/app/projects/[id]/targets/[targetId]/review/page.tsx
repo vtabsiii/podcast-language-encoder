@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import type { ReviewResponse } from '@polycast/contracts';
 import type { CommentsResponse } from '@/lib/contract-types';
 import { apiGet } from '@/lib/api';
+import { redirectIfUnauthenticated } from '@/lib/auth-redirect';
 import { ApiError, describeError } from '@/lib/errors';
 import { ReviewStudio } from './review-studio';
 
@@ -24,6 +25,7 @@ export default async function ReviewPage({
       () => ({ comments: [] }),
     );
   } catch (e) {
+    await redirectIfUnauthenticated(e);
     if (e instanceof ApiError && e.status === 404) notFound();
     return (
       <section aria-labelledby="review-error-heading">

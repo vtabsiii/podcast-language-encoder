@@ -10,6 +10,9 @@ from polycast_worker.providers import (
     TranscriptionProvider,
     TranslationProvider,
 )
+from polycast_worker.providers.aws.clients import ClientFactory
+from polycast_worker.providers.aws.ses import SesNotifier
+from polycast_worker.providers.inapp import InAppNotifier
 from polycast_worker.providers.mock import (
     MockLipSyncProvider,
     MockQualityProvider,
@@ -17,7 +20,10 @@ from polycast_worker.providers.mock import (
     MockTranscriptionProvider,
     MockTranslationProvider,
 )
+from polycast_worker.providers.registry import build_providers
+from polycast_worker.tools import Tools
 
+from .aws_stubs import MemoryStorage
 from .conftest import new_id
 
 
@@ -137,15 +143,36 @@ def test_production_config_fails_closed():
     )
     assert cfg.region == "us-east-1"
     assert cfg.storage_driver == "s3"
-    # M3: production also needs the SES sender for FR-055 notifications
-    with pytest.raises(RuntimeError, match="SES_FROM_ADDRESS"):
+    assert cfg.ses_from_address == "noreply@example.test"
+
+
+def test_production_config_allows_missing_ses_sender():
+    # Email is optional in production: without SES_FROM_ADDRESS notifications stay in-app.
+    cfg = WorkerConfig.from_env(
+        {
+            "POLYCAST_ENV": "production",
+            "PROVIDER_MODE": "aws",
+            "WORKER_QUEUE_URL": "q",
+            "MEDIA_BUCKET_SOURCE": "b",
+            "STORAGE_DRIVER": "s3",
+            "WORKER_TOKEN": "real-secret",
+        }
+    )
+    assert cfg.env == "production" and cfg.ses_from_address is None
+    providers = build_providers(
+        cfg, ClientFactory.with_clients({}, cfg.region), storage=MemoryStorage(), tools=Tools.none()
+    )
+    assert providers.mode == "aws"
+    assert isinstance(providers.notifier, InAppNotifier)
+    assert not isinstance(providers.notifier, SesNotifier)
+    # Everything else still fails closed.
+    with pytest.raises(RuntimeError, match="STORAGE_DRIVER=s3"):
         WorkerConfig.from_env(
             {
                 "POLYCAST_ENV": "production",
                 "PROVIDER_MODE": "aws",
                 "WORKER_QUEUE_URL": "q",
                 "MEDIA_BUCKET_SOURCE": "b",
-                "STORAGE_DRIVER": "s3",
                 "WORKER_TOKEN": "real-secret",
             }
         )

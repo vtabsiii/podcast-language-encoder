@@ -11,7 +11,7 @@ export interface PolycastFixtureOptions {
   webOrigins?: string[];
   cloudFrontPublicKeyPem?: string;
   monthlyBudgetUsd?: number;
-  imageTag?: string;
+  sesFromAddress?: string;
 }
 
 /**
@@ -48,7 +48,6 @@ export function buildPolycastApp(options: PolycastFixtureOptions = {}) {
     userPool: auth.userPool,
     userPoolClientId: auth.userPoolClient.userPoolClientId,
     webOrigins,
-    imageTag: options.imageTag,
   });
   const orchestration = new PolycastOrchestrationStack(app, 'PolycastOrchestration', {
     vpc: network.vpc,
@@ -58,7 +57,7 @@ export function buildPolycastApp(options: PolycastFixtureOptions = {}) {
     apiUrl: api.apiUrl,
     apiLoadBalancerSecurityGroup: api.loadBalancerSecurityGroup,
     workerTokenSecret: api.workerTokenSecret,
-    imageTag: options.imageTag,
+    sesFromAddress: options.sesFromAddress,
     monthlyBudgetUsd: options.monthlyBudgetUsd,
   });
   const web = new PolycastWebStack(app, 'PolycastWeb', {
@@ -68,7 +67,10 @@ export function buildPolycastApp(options: PolycastFixtureOptions = {}) {
     apiLoadBalancerSecurityGroup: api.loadBalancerSecurityGroup,
     derivedBucketArn: storage.derivedBucket.bucketArn,
     derivedBucketName: storage.derivedBucket.bucketName,
-    imageTag: options.imageTag,
+    webOrigins,
+    userPoolId: auth.userPool.userPoolId,
+    userPoolClientId: auth.userPoolClient.userPoolClientId,
+    hostedUiUrl: auth.userPoolDomain.baseUrl(),
     cloudFrontPublicKeyPem: options.cloudFrontPublicKeyPem,
   });
 

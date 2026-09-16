@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # services/media-worker on Python 3.12 with ffmpeg. Build from the repository root:
 #   docker build -f services/media-worker/Dockerfile -t polycast/media-worker:<tag> .
-# Not built in CI (docs/aws-setup.md "Polycast stacks"); pushed manually to ECR polycast/media-worker.
+# Built and published by `cdk deploy` as a Docker image asset (docs/aws-setup.md "Polycast stacks").
 
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1

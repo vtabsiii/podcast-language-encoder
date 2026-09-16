@@ -76,9 +76,7 @@ describe('PolycastOrchestrationStack', () => {
   });
 
   test('media worker: 1 task (1024/2048), scales 1-4 on stage queue depth, can reach the API', () => {
-    template.hasResourceProperties('AWS::ECR::Repository', {
-      RepositoryName: 'polycast/media-worker',
-    });
+    template.resourceCountIs('AWS::ECR::Repository', 0);
     template.hasResourceProperties('AWS::ECS::Service', {
       ServiceName: 'polycast-media-worker',
       DesiredCount: 1,
@@ -90,6 +88,9 @@ describe('PolycastOrchestrationStack', () => {
         Match.objectLike({
           Name: 'media-worker',
           Command: Match.arrayWith(['python', '-m', 'polycast_worker', '--api-url']),
+          Image: Match.objectLike({
+            'Fn::Sub': Match.stringLikeRegexp('container-assets-.*:[0-9a-f]{64}$'),
+          }),
           Environment: Match.arrayWith([
             { Name: 'POLYCAST_ENV', Value: 'production' },
             { Name: 'PROVIDER_MODE', Value: 'aws' },
@@ -201,5 +202,29 @@ describe('PolycastOrchestrationStack', () => {
         { Key: 'polycast:stack', Value: 'PolycastOrchestration' },
       ]),
     });
+  });
+});
+
+describe('PolycastOrchestrationStack with an SES sender', () => {
+  test('passes SES_FROM_ADDRESS to the worker only when configured', () => {
+    const withSes = Template.fromStack(
+      buildPolycastApp({ sesFromAddress: 'noreply@polycast.example' }).orchestration,
+    );
+    withSes.hasResourceProperties('AWS::ECS::TaskDefinition', {
+      ContainerDefinitions: [
+        Match.objectLike({
+          Name: 'media-worker',
+          Environment: Match.arrayWith([
+            { Name: 'SES_FROM_ADDRESS', Value: 'noreply@polycast.example' },
+          ]),
+        }),
+      ],
+    });
+    const without = Template.fromStack(buildPolycastApp().orchestration);
+    const [taskDef] = Object.values(without.findResources('AWS::ECS::TaskDefinition'));
+    const names = taskDef.Properties.ContainerDefinitions[0].Environment.map(
+      (e: { Name: string }) => e.Name,
+    );
+    expect(names).not.toContain('SES_FROM_ADDRESS');
   });
 });

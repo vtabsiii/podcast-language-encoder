@@ -25,6 +25,7 @@ import { healthRoutes } from './routes/health.js';
 import { internalRoutes } from './routes/internal.js';
 import { jobRoutes } from './routes/jobs.js';
 import { localStorageRoutes } from './routes/local-storage.js';
+import { organizationRoutes } from './routes/organizations.js';
 import { projectRoutes } from './routes/projects.js';
 import { reviewRoutes } from './routes/review.js';
 import { uploadRoutes } from './routes/uploads.js';
@@ -115,6 +116,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
       tags: [
         { name: 'ops' },
         { name: 'auth' },
+        { name: 'organizations' },
         { name: 'capabilities' },
         { name: 'projects' },
         { name: 'uploads' },
@@ -163,6 +165,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
       async (v1) => {
         await v1.register(capabilityRoutes, { config });
         await v1.register(authRoutes, { config, db });
+        await v1.register(organizationRoutes, { db });
         await v1.register(projectRoutes, { projects, jobs });
         await v1.register(uploadRoutes, { uploads });
         await v1.register(jobRoutes, { jobs });
