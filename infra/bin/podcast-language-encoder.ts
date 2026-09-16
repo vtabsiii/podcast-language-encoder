@@ -50,7 +50,7 @@ cdk.Tags.of(encoder).add('project', 'podcast-language-encoder');
 // Synthesized and tested in CI; deployed only by the manual deploy-polycast workflow
 // (docs/aws-setup.md "Polycast stacks"). Context keys, all optional:
 //   polycastWebOrigins             comma-separated browser origins (CORS, Cognito callbacks)
-//   polycastImageTag               ECR tag for the three images (default latest)
+//   polycastSesFromAddress         verified SES sender for worker email notifications
 //   polycastCognitoDomainPrefix    hosted UI prefix (default polycast-<account id>)
 //   polycastMonthlyBudgetUsd       AWS Budgets limit (default 200)
 //   polycastCloudFrontPublicKeyPem RSA public key enabling the signed /media/* behaviour
@@ -62,7 +62,7 @@ const polycastWebOrigins = (contextString('polycastWebOrigins') ?? 'http://local
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
-const polycastImageTag = contextString('polycastImageTag') ?? 'latest';
+const polycastSesFromAddress = contextString('polycastSesFromAddress');
 const polycastCognitoDomainPrefix =
   contextString('polycastCognitoDomainPrefix') ?? `polycast-${cdk.Aws.ACCOUNT_ID}`;
 const polycastMonthlyBudgetUsd = Number(contextString('polycastMonthlyBudgetUsd') ?? 200);
@@ -106,7 +106,6 @@ const api = new PolycastApiStack(app, 'PolycastApi', {
   userPool: auth.userPool,
   userPoolClientId: auth.userPoolClient.userPoolClientId,
   webOrigins: polycastWebOrigins,
-  imageTag: polycastImageTag,
   description: 'Polycast Studio: apps/api on Fargate behind an internal ALB',
 });
 new PolycastOrchestrationStack(app, 'PolycastOrchestration', {
@@ -118,7 +117,7 @@ new PolycastOrchestrationStack(app, 'PolycastOrchestration', {
   apiUrl: api.apiUrl,
   apiLoadBalancerSecurityGroup: api.loadBalancerSecurityGroup,
   workerTokenSecret: api.workerTokenSecret,
-  imageTag: polycastImageTag,
+  sesFromAddress: polycastSesFromAddress,
   monthlyBudgetUsd: polycastMonthlyBudgetUsd,
   description: 'Polycast Studio: Step Functions, EventBridge, SQS, media worker, budget',
 });
@@ -130,7 +129,10 @@ new PolycastWebStack(app, 'PolycastWeb', {
   apiLoadBalancerSecurityGroup: api.loadBalancerSecurityGroup,
   derivedBucketArn: storage.derivedBucket.bucketArn,
   derivedBucketName: storage.derivedBucket.bucketName,
-  imageTag: polycastImageTag,
+  webOrigins: polycastWebOrigins,
+  userPoolId: auth.userPool.userPoolId,
+  userPoolClientId: auth.userPoolClient.userPoolClientId,
+  hostedUiUrl: auth.userPoolDomain.baseUrl(),
   cloudFrontPublicKeyPem: polycastCloudFrontPublicKeyPem,
   description: 'Polycast Studio: apps/web on Fargate behind CloudFront',
 });

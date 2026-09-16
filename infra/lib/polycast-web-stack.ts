@@ -2,14 +2,13 @@ import * as cdk from 'aws-cdk-lib';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
-import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
-import { tagPolycastStack } from './polycast-common';
+import { polycastContainerImage, tagPolycastStack } from './polycast-common';
 
 export interface PolycastWebStackProps extends cdk.StackProps {
   vpc: ec2.IVpc;
@@ -22,8 +21,12 @@ export interface PolycastWebStackProps extends cdk.StackProps {
   /** Derived bucket (PolycastStorage) served under `/media/*` through signed URLs. */
   derivedBucketArn: string;
   derivedBucketName: string;
-  /** ECR image tag to run; defaults to `latest`. */
-  imageTag?: string;
+  /** Browser origins; the first one is `WEB_ORIGIN` for the sign-in redirect URIs. */
+  webOrigins: string[];
+  /** Cognito app client (public, no secret) and hosted UI base URL for the sign-in flow. */
+  userPoolId: string;
+  userPoolClientId: string;
+  hostedUiUrl: string;
   /**
    * PEM-encoded RSA public key for the CloudFront key group that signs `/media/*` URLs.
    * When omitted the `/media/*` behaviour is not created (see the `MediaBehavior` output).
@@ -42,8 +45,7 @@ export const ORIGIN_VERIFY_HEADER = 'X-Origin-Verify';
  * - default and `/api/*` -> web ALB (HTTPS-only viewers, all methods, no caching, all
  *   headers/cookies/query forwarded). The Next.js route handler proxies `/api/*` to the API's
  *   internal ALB, so the API is never exposed directly.
- * - `/_next/static/*`, `/assets/*` -> static assets bucket through an origin access control,
- *   cached for a year (immutable file names).
+ * - `/_next/static/*` -> web ALB as well, but cached (Next.js emits immutable hashed names).
  * - `/media/*` -> derived bucket through an origin access control, restricted to a key group
  *   (present only when `cloudFrontPublicKeyPem` is given).
  *
@@ -52,25 +54,13 @@ export const ORIGIN_VERIFY_HEADER = 'X-Origin-Verify';
  * certificate: the distribution uses its `*.cloudfront.net` name and reaches the ALB over HTTP.
  */
 export class PolycastWebStack extends cdk.Stack {
-  public readonly repository: ecr.Repository;
   public readonly service: ecs.FargateService;
   public readonly loadBalancer: elbv2.ApplicationLoadBalancer;
-  public readonly staticAssetsBucket: s3.Bucket;
   public readonly distribution: cloudfront.Distribution;
 
   constructor(scope: Construct, id: string, props: PolycastWebStackProps) {
     super(scope, id, props);
     tagPolycastStack(this, 'web');
-
-    const imageTag = props.imageTag ?? 'latest';
-
-    this.repository = new ecr.Repository(this, 'Repository', {
-      repositoryName: 'polycast/web',
-      imageScanOnPush: true,
-      imageTagMutability: ecr.TagMutability.MUTABLE,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      lifecycleRules: [{ description: 'keep the last 20 images', maxImageCount: 20 }],
-    });
 
     // ------------------------------------------------------------- service
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'TaskDefinition', {
@@ -82,13 +72,19 @@ export class PolycastWebStack extends cdk.Stack {
       },
     });
     const container = taskDefinition.addContainer('web', {
-      image: ecs.ContainerImage.fromEcrRepository(this.repository, imageTag),
+      image: polycastContainerImage(this, 'Image', 'apps/web/Dockerfile'),
       environment: {
         NODE_ENV: 'production',
         PORT: '3000',
         HOSTNAME: '0.0.0.0',
         NEXT_TELEMETRY_DISABLED: '1',
         API_BASE_URL: props.apiInternalUrl,
+        AUTH_MODE: 'cognito',
+        AWS_REGION: this.region,
+        COGNITO_USER_POOL_ID: props.userPoolId,
+        COGNITO_CLIENT_ID: props.userPoolClientId,
+        COGNITO_HOSTED_UI_URL: props.hostedUiUrl,
+        WEB_ORIGIN: props.webOrigins[0] ?? 'http://localhost:3000',
       },
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'web',
@@ -171,15 +167,6 @@ export class PolycastWebStack extends cdk.Stack {
         targetUtilizationPercent: 60,
       });
 
-    // -------------------------------------------------------------- static assets
-    this.staticAssetsBucket = new s3.Bucket(this, 'StaticAssets', {
-      bucketName: `polycast-web-static-${this.account}-${this.region}`,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      enforceSSL: true,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-    });
-
     // ------------------------------------------------------------- CloudFront
     const responseHeadersPolicy = new cloudfront.ResponseHeadersPolicy(this, 'SecurityHeaders', {
       comment: 'Polycast Studio security headers',
@@ -217,7 +204,7 @@ export class PolycastWebStack extends cdk.Stack {
       compress: true,
     };
     const staticBehavior: cloudfront.BehaviorOptions = {
-      origin: origins.S3BucketOrigin.withOriginAccessControl(this.staticAssetsBucket),
+      origin: webOrigin,
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
       allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
       cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
@@ -227,7 +214,6 @@ export class PolycastWebStack extends cdk.Stack {
 
     const additionalBehaviors: Record<string, cloudfront.BehaviorOptions> = {
       '/_next/static/*': staticBehavior,
-      '/assets/*': staticBehavior,
       '/api/*': dynamicBehavior,
     };
 
@@ -284,10 +270,6 @@ export class PolycastWebStack extends cdk.Stack {
     });
     new cdk.CfnOutput(this, 'DistributionId', { value: this.distribution.distributionId });
     new cdk.CfnOutput(this, 'WebAlbDnsName', { value: this.loadBalancer.loadBalancerDnsName });
-    new cdk.CfnOutput(this, 'StaticAssetsBucketName', {
-      value: this.staticAssetsBucket.bucketName,
-    });
-    new cdk.CfnOutput(this, 'WebRepositoryUri', { value: this.repository.repositoryUri });
     new cdk.CfnOutput(this, 'MediaBehavior', { value: mediaBehaviorNote });
   }
 }

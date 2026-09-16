@@ -18,6 +18,7 @@
     "node": ">=22"
   },
   "devDependencies": {
+    "@aws-sdk/client-ecs": "^3.1133.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.0.0",
     "aws-cdk": "^2.1000.0",
