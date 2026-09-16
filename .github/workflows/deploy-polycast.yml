@@ -54,7 +54,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @polycast/infra build
-      - run: pnpm --filter @polycast/infra test -- --ci
+      - run: pnpm --filter @polycast/infra test --ci
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
