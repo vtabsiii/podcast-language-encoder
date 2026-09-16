@@ -30,6 +30,12 @@ const EnvSchema = z.object({
   DB_APP_USER: z.string().optional(),
   DB_APP_PASSWORD: z.string().optional(),
   DB_SSL: z.enum(['disable', 'require']).default('disable'),
+  /**
+   * PEM bundle that signs the database server certificate (Amazon RDS global bundle in the
+   * image). With it, `require` verifies the chain and host name (sslmode=verify-full);
+   * without it node-postgres would trust only the public CAs, which Aurora does not use.
+   */
+  DB_SSL_ROOT_CERT: z.string().optional(),
   DATABASE_POOL_MAX: z.coerce.number().int().positive().default(10),
 
   /** "local" keeps objects on disk and signs URLs served by this API; "s3" is MinIO or AWS S3. */
@@ -72,8 +78,17 @@ export type AppConfig = z.infer<typeof EnvSchema>;
 
 function composeUrl(user: string, password: string, cfg: z.infer<typeof EnvSchema>): string {
   const auth = `${encodeURIComponent(user)}:${encodeURIComponent(password)}`;
-  const ssl = cfg.DB_SSL === 'require' ? '?sslmode=require' : '';
-  return `postgres://${auth}@${cfg.DB_HOST}:${cfg.DB_PORT}/${cfg.DB_NAME}${ssl}`;
+  const params = new URLSearchParams();
+  if (cfg.DB_SSL === 'require') {
+    if (cfg.DB_SSL_ROOT_CERT) {
+      params.set('sslmode', 'verify-full');
+      params.set('sslrootcert', cfg.DB_SSL_ROOT_CERT);
+    } else {
+      params.set('sslmode', 'require');
+    }
+  }
+  const qs = params.toString();
+  return `postgres://${auth}@${cfg.DB_HOST}:${cfg.DB_PORT}/${cfg.DB_NAME}${qs ? `?${qs}` : ''}`;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {

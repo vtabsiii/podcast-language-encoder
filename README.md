@@ -90,12 +90,12 @@ Sign-in is selected by `AUTH_MODE` (read server-side at request time, never `NEX
   membership yet (403 `FORBIDDEN`) lands on `/login/organization`, which creates one through
   `POST /api/v1/organizations`. Expired sessions go through `GET /auth/refresh?next=…`
   (silent renewal with a loop guard) before falling back to `/login`; `GET /logout` also ends
-  the hosted-UI session and returns with `?done=1`. With a live session, `/login` is the
+  the hosted-UI session and returns through `/logout/done`. With a live session, `/login` is the
   organization switcher the topbar links to.
 
   Required env vars in cognito mode: `AUTH_MODE=cognito`, `COGNITO_CLIENT_ID`,
   `COGNITO_HOSTED_UI_URL` (no trailing slash) and `WEB_ORIGIN` (public origin; the app client
-  must list `${WEB_ORIGIN}/auth/callback` as a callback URL and `${WEB_ORIGIN}/logout?done=1`
+  must list `${WEB_ORIGIN}/auth/callback` as a callback URL and `${WEB_ORIGIN}/logout/done`
   as a sign-out URL). `WEB_ORIGIN` falls back to the request origin when unset, plus
   `API_BASE_URL` as always. Nothing in the flow logs tokens or codes.
 

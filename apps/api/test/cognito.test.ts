@@ -97,6 +97,19 @@ describe('database url composition from secret parts (ECS)', () => {
       'postgres://polycast_app:app@db.internal:5432/polycast?sslmode=require',
     );
   });
+  test('a CA bundle upgrades require to verify-full with sslrootcert', () => {
+    const cfg = loadConfig({
+      NODE_ENV: 'test',
+      DB_HOST: 'db.internal',
+      DB_OWNER_USER: 'polycast',
+      DB_OWNER_PASSWORD: 'pw',
+      DB_SSL: 'require',
+      DB_SSL_ROOT_CERT: '/etc/ssl/certs/aws-rds-global-bundle.pem',
+    });
+    expect(cfg.DATABASE_URL).toBe(
+      'postgres://polycast:pw@db.internal:5432/polycast?sslmode=verify-full&sslrootcert=%2Fetc%2Fssl%2Fcerts%2Faws-rds-global-bundle.pem',
+    );
+  });
   test('explicit URLs win over parts', () => {
     const cfg = loadConfig({
       NODE_ENV: 'test',

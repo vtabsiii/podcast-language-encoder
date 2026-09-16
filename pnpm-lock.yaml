@@ -173,6 +173,9 @@ importers:
         specifier: ^0.5.21
         version: 0.5.21
     devDependencies:
+      '@aws-sdk/client-ecs':
+        specifier: ^3.1133.0
+        version: 3.1133.0
       '@types/jest':
         specifier: ^29.5.14
         version: 29.5.14
@@ -296,6 +299,10 @@ packages:
 
   '@aws-sdk/checksums@3.1001.0':
     resolution: {integrity: sha512-6uTniZc87q+B5eXouGTl+7Tmc482rEeCcvxpsvREP8EfF0gvloRZ41UOA9sbSJlyy8TbqIBXb3kKfKarEArUQA==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-ecs@3.1133.0':
+    resolution: {integrity: sha512-BndRuaW3hzWONVmSSvHa9LFxB10mbBelB1D40Vbgxm+hOvFe0wxd/V6Rb3kqaYSMw4Au8+04vnHdToKGGWBEHQ==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-polly@3.1133.0':
@@ -4464,6 +4471,17 @@ snapshots:
       '@aws-sdk/core': 3.978.0
       '@aws-sdk/types': 3.974.5
       '@smithy/core': 3.34.1
+      '@smithy/types': 4.18.0
+      tslib: 2.8.1
+
+  '@aws-sdk/client-ecs@3.1133.0':
+    dependencies:
+      '@aws-sdk/core': 3.978.0
+      '@aws-sdk/credential-provider-node': 3.972.83
+      '@aws-sdk/types': 3.974.5
+      '@smithy/core': 3.34.1
+      '@smithy/fetch-http-handler': 5.8.0
+      '@smithy/node-http-handler': 4.12.1
       '@smithy/types': 4.18.0
       tslib: 2.8.1
 

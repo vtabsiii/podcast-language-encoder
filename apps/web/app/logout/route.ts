@@ -7,14 +7,14 @@ import { hostedLogoutUrl, logoutUri } from '@/lib/cognito';
 export const dynamic = 'force-dynamic';
 
 /**
- * Clears every session cookie and returns to /login. Under Cognito the first visit also ends
- * the hosted-UI session: the browser goes to the pool's /logout, which sends it back here with
- * `?done=1`, and that second visit lands on /login.
+ * Clears every session cookie and returns to /login. Under Cognito it also ends the hosted-UI
+ * session: the browser goes to the pool's /logout, which sends it back to /logout/done (a
+ * registered sign-out URL; Cognito matches those exactly, so no query string is involved).
  */
 export async function GET(req: NextRequest) {
   const jar = await cookies();
   clearAuthCookies(jar);
-  if (authMode() === 'cognito' && req.nextUrl.searchParams.get('done') !== '1') {
+  if (authMode() === 'cognito') {
     try {
       const config = cognitoConfig();
       return redirectTo(

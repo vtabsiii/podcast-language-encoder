@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # apps/api on Node 22. Build from the repository root:
 #   docker build -f apps/api/Dockerfile -t polycast/api:<tag> .
-# Not built in CI (docs/aws-setup.md "Polycast stacks"); pushed manually to ECR polycast/api.
+# Built and published by `cdk deploy` as a Docker image asset (docs/aws-setup.md "Polycast stacks").
 
 FROM node:22-slim AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH CI=1
@@ -22,7 +22,10 @@ FROM node:22-slim AS runtime
 ENV NODE_ENV=production PORT=4000 HOST=0.0.0.0
 RUN apt-get update \
   && apt-get install -y --no-install-recommends curl ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* \
+  # Amazon RDS certificate bundle (all regions) for sslmode=verify-full against Aurora.
+  && curl -fsSL https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem \
+       -o /etc/ssl/certs/aws-rds-global-bundle.pem
 WORKDIR /app
 COPY --from=build --chown=node:node /out ./
 COPY --from=build --chown=node:node /repo/apps/api/dist ./dist

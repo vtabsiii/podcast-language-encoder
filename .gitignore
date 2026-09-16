@@ -53,3 +53,6 @@ apps/web/e2e/.tmp/
 
 # Local Claude Code settings (shared settings.json is committed; local overrides are not)
 .claude/settings.local.json
+
+# Claude Code agent worktrees
+.claude/worktrees/

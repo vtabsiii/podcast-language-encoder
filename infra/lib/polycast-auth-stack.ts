@@ -93,7 +93,7 @@ export class PolycastAuthStack extends cdk.Stack {
         flows: { authorizationCodeGrant: true },
         scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
         callbackUrls: webOrigins.map((origin) => `${origin}/auth/callback`),
-        logoutUrls: webOrigins.map((origin) => `${origin}/logout`),
+        logoutUrls: webOrigins.map((origin) => `${origin}/logout/done`),
       },
     });
 

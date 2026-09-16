@@ -32,7 +32,7 @@ export function redirectUri(config: CognitoConfig, requestOrigin: string): strin
 }
 
 export function logoutUri(config: CognitoConfig, requestOrigin: string): string {
-  return `${publicOrigin(config, requestOrigin)}${LOGOUT_PATH}?done=1`;
+  return `${publicOrigin(config, requestOrigin)}${LOGOUT_PATH}/done`;
 }
 
 export function authorizeUrl(
