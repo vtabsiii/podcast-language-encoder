@@ -77,9 +77,24 @@ export class PolycastDataStack extends cdk.Stack {
     this.ownerSecret = this.cluster.secret;
     this.cluster.addRotationSingleUser({ automaticallyAfter: cdk.Duration.days(30) });
 
-    // 'AppSecretV2': the first secret's value was echoed into deploy logs by a failed
-    // migration on 2026-09-16; a new construct id replaces the secret with a fresh value and
-    // the next migration realigns the role. Never reuse the old id.
+    // TRANSITIONAL (remove after the deploy that follows the AppSecretV2 switch): the first
+    // application secret's value was echoed into deploy logs on 2026-09-16. Its replacement is
+    // AppSecretV2 below, but PolycastApi still imports this secret's ARN until it has been
+    // redeployed against the new one, and CloudFormation refuses to drop an export that is in
+    // use. Keeping the resource plus an explicit export of the same name lets both stacks
+    // update in one run; the next change deletes this block (and the exposed value with it).
+    const legacyAppSecret = new secretsmanager.Secret(this, 'AppSecret', {
+      description: 'Polycast: least-privilege application role for request handlers (RLS)',
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({ username: 'polycast_app', dbname: 'polycast' }),
+        generateStringKey: 'password',
+        excludePunctuation: true,
+        passwordLength: 40,
+      },
+    });
+    this.exportValue(legacyAppSecret.secretArn);
+
+    // 'AppSecretV2': fresh value; the migration realigns the role to it. Never reuse the old id.
     this.appSecret = new secretsmanager.Secret(this, 'AppSecretV2', {
       description: 'Polycast: least-privilege application role for request handlers (RLS)',
       generateSecretString: {
