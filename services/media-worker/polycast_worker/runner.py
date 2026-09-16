@@ -17,7 +17,9 @@ from pydantic import ValidationError
 
 from .client import ApiClient, ApiError
 from .models import OUTPUT_MODELS, Stage, TaskError, TaskResult, WorkerTask
-from .stages import StageError, handler_for
+from .providers.base import ProviderError
+from .providers.registry import ProviderSet
+from .stages import StageEnv, StageError, handler_for
 from .storage import Storage, StorageError, StorageUriError
 from .tools import ToolError, Tools
 
@@ -34,16 +36,23 @@ def _failed(worker_id: str, code: str, message: str, retryable: bool) -> TaskRes
     )
 
 
-def run_task(task: WorkerTask, storage: Storage, tools: Tools, worker_id: str) -> TaskResult:
+def run_task(
+    task: WorkerTask,
+    storage: Storage,
+    tools: Tools,
+    worker_id: str,
+    env: StageEnv | None = None,
+) -> TaskResult:
+    """Run one task. `env` carries the provider registry and lease hooks; None = local mocks."""
     started = time.monotonic()
     result: TaskResult
     try:
-        output = handler_for(task.stage)(task, storage, tools)
+        output = handler_for(task.stage)(task, storage, tools, env)
         OUTPUT_MODELS[task.stage].model_validate(output)
         result = TaskResult(
             status="succeeded", retryable=False, error=None, output=output, workerId=worker_id
         )
-    except StageError as e:
+    except (StageError, ProviderError) as e:
         result = _failed(worker_id, e.code, e.message, e.retryable)
     except (ValidationError, StorageUriError, ValueError):
         result = _failed(
@@ -86,6 +95,14 @@ def run_task(task: WorkerTask, storage: Storage, tools: Tools, worker_id: str) -
     return result
 
 
+def _safe_heartbeat(client: ApiClient, task_id: str) -> None:
+    """Lease renewal from inside a provider poll loop; a failed beat must not fail the task."""
+    try:
+        client.heartbeat(task_id)
+    except ApiError:
+        log.warning("heartbeat failed during provider poll (retrying at next poll)")
+
+
 class Heartbeat:
     """Background lease renewal every `interval_s` while a task runs."""
 
@@ -123,12 +140,18 @@ def run_loop(
     stages: list[Stage] | None = None,
     sleep: Callable[[float], None] = time.sleep,
     max_tasks: int | None = None,
+    providers: ProviderSet | None = None,
+    provider_poll_interval_s: float = 5.0,
 ) -> int:
     """Claim and run tasks. With `once`, exit 0 at the first empty claim (204).
 
-    Returns a process exit code. `max_tasks` is a safety valve for tests.
+    Returns a process exit code. `max_tasks` is a safety valve for tests. `providers` is the
+    registry built from configuration (None = the local mock set); `sleep` also paces
+    provider polling, whose every iteration renews the task lease.
     """
     processed = 0
+    if providers is None:
+        providers = StageEnv.local(storage, tools).providers
     while max_tasks is None or processed < max_tasks:
         try:
             raw = client.claim_raw(stages)
@@ -166,8 +189,14 @@ def run_loop(
             continue
 
         log.info("claimed task %s stage %s attempt %d", task.taskId, task.stage, task.attempt)
+        env = StageEnv(
+            providers=providers,
+            heartbeat=partial(_safe_heartbeat, client, task.taskId),
+            sleep=sleep,
+            poll_interval_s=provider_poll_interval_s,
+        )
         with Heartbeat(partial(client.heartbeat, task.taskId), task.leaseSeconds / 3):
-            result = run_task(task, storage, tools, client.worker_id)
+            result = run_task(task, storage, tools, client.worker_id, env)
         try:
             client.post_result(task.taskId, result)
         except ApiError as e:

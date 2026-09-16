@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from .client import ApiClient
 from .config import WorkerConfig
 from .logsafe import configure_logging
+from .providers.registry import build_providers
 from .runner import run_loop
 from .storage import LocalFsStorage, S3Storage, Storage
 from .tools import Tools
@@ -48,11 +49,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     configure_logging(logging.DEBUG if args.verbose else logging.INFO)
     worker_id = args.worker_id or f"{socket.gethostname()}-{os.getpid()}"
     tools = Tools.detect()
+    storage = build_storage(cfg)
+    providers = build_providers(cfg, storage=storage, tools=tools)
     log.info(
-        "worker %s starting: env=%s storage=%s ffmpeg=%s ffprobe=%s",
+        "worker %s starting: env=%s storage=%s providers=%s ffmpeg=%s ffprobe=%s",
         worker_id,
         cfg.env,
         cfg.storage_driver,
+        providers.mode,
         tools.has_ffmpeg,
         tools.has_ffprobe,
     )
@@ -60,10 +64,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         return run_loop(
             client,
-            build_storage(cfg),
+            storage,
             tools,
             once=args.once,
             poll_interval_s=max(0.1, args.poll_interval),
+            providers=providers,
         )
     except KeyboardInterrupt:
         log.info("worker %s stopping", worker_id)

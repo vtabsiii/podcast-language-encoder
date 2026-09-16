@@ -1,0 +1,13 @@
+{
+  "service": "ses",
+  "operation": "send_email",
+  "expected_params": {
+    "Source": "noreply@polycast.test",
+    "Destination": {
+      "ToAddresses": ["reviewer@example.test"]
+    }
+  },
+  "response": {
+    "MessageId": "0100018f3a2e7b1c-6f1d0a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b-000000"
+  }
+}

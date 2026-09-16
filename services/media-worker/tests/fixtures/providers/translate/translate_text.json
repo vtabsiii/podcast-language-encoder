@@ -1,0 +1,14 @@
+{
+  "service": "translate",
+  "operation": "translate_text",
+  "expected_params": {
+    "Text": "Visit polycast.example.com for 3 free episodes.",
+    "SourceLanguageCode": "en",
+    "TargetLanguageCode": "es-MX"
+  },
+  "response": {
+    "TranslatedText": "Visita polycast.example.com para 3 episodios gratis.",
+    "SourceLanguageCode": "en",
+    "TargetLanguageCode": "es-MX"
+  }
+}

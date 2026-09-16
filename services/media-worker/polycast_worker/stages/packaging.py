@@ -31,22 +31,17 @@ from ..models import (
     TranslationInput,
     WorkerTask,
 )
-from ..providers.base import CapabilityRecord
-from ..providers.mock import (
-    MockLipSyncProvider,
-    MockQualityProvider,
-    MockSpeechProvider,
-    MockTranscriptionProvider,
-    MockTranslationProvider,
-)
+from ..providers.registry import ProviderSet
 from ..storage import Storage, join_uri, sha256_of_path
 from ..tools import Tools
 from .common import (
+    StageEnv,
     StageError,
     content_type_for,
     find_artifact,
     now_iso,
     require_source,
+    resolve_env,
     segments_by_seq,
     source_extension,
     translations_by_segment,
@@ -57,6 +52,10 @@ GENERATOR = f"polycast-media-worker/{__version__}"
 DISCLOSURE = (
     "Generated with mock providers: audio is the untranslated source; "
     "captions are pseudo-translations."
+)
+DISCLOSURE_SYNTHETIC = (
+    "Dialogue was machine-translated and voiced with a synthetic (stock) voice; "
+    "lip sync was not applied. Providers are listed in `models` with their tiers."
 )
 PROVENANCE_FILE = "provenance.json"
 CHECKSUMS_FILE = "checksums.sha256"
@@ -170,31 +169,39 @@ def _qc_report(params: TargetParams) -> QcReport:
     )
 
 
-def _mock_models(params: TargetParams) -> list[ProvenanceModel]:
-    records: list[CapabilityRecord] = []
-    records += MockTranscriptionProvider().capabilities()
-    records += MockTranslationProvider().capabilities()
-    records += MockSpeechProvider().capabilities()
-    if params.lipSync:
-        records += MockLipSyncProvider().capabilities()
-    records += MockQualityProvider().capabilities()
-    return [
-        ProvenanceModel(
-            capability=r.kind,
-            adapterId=r.adapterId,
-            version=r.version,
-            tier=r.tier,
-            dataPolicy=r.dataPolicy,
+def provenance_models(providers: ProviderSet, params: TargetParams) -> list[ProvenanceModel]:
+    """One entry per (capability, adapter) that took part, narrowed to the target locale.
+
+    In local mode the encoder is left out: the M1 manifest lists exactly the mock set."""
+    seen: set[tuple[str, str]] = set()
+    out: list[ProvenanceModel] = []
+    for r in providers.capabilities(locale=params.targetLocale, lip_sync=params.lipSync):
+        if providers.is_mock and r.kind == "encode":
+            continue
+        if (r.kind, r.adapterId) in seen:
+            continue
+        seen.add((r.kind, r.adapterId))
+        out.append(
+            ProvenanceModel(
+                capability=r.kind,
+                adapterId=r.adapterId,
+                version=r.version,
+                tier=r.tier,
+                dataPolicy=r.dataPolicy,
+            )
         )
-        for r in records
-    ]
+    return out
 
 
 def _dump_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def run(task: WorkerTask, storage: Storage, tools: Tools) -> dict[str, object]:
+def run(
+    task: WorkerTask, storage: Storage, tools: Tools, env: StageEnv | None = None
+) -> dict[str, object]:
+    env = resolve_env(env, storage, tools)
+    providers = env.providers
     params = task.target_params()
     prefix = task.storage.deliverablesPrefix
     if prefix is None:
@@ -240,14 +247,14 @@ def run(task: WorkerTask, storage: Storage, tools: Tools) -> dict[str, object]:
             sourceLocale=params.sourceLocale,
             targetLocale=locale,
             sourceSha256=params.sourceSha256,
-            syntheticVoice=False,
+            syntheticVoice=not providers.is_mock and bool(params.speech),
             lipSyncApplied=False,
-            mock=True,
-            models=_mock_models(params),
+            mock=providers.is_mock,
+            models=provenance_models(providers, params),
             segmentCount=len(segments),
             translationVersionIds=translation_ids,
             files=[ManifestFile(fileName=f.name, sha256=f.sha256, byteSize=f.size) for f in files],
-            disclosure=DISCLOSURE,
+            disclosure=DISCLOSURE if providers.is_mock else DISCLOSURE_SYNTHETIC,
         )
         prov = wd / PROVENANCE_FILE
         _dump_json(prov, manifest.model_dump())

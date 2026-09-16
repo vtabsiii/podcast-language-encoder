@@ -1,7 +1,8 @@
-"""ANALYZING: proxy + waveform from the immutable source, then the mock analysis fixture.
+"""ANALYZING: proxy + waveform from the immutable source, then transcription/diarization.
 
-The fixture is deterministic per assetId so re-runs and tests see identical segments.
-It is a Mock adapter (tier unavailable): no real language detection or transcription.
+local mode  deterministic fixture per assetId (Mock adapter, tier unavailable)
+aws mode    TranscriptionProvider: start the job first, build proxy/waveform while it
+            runs, then poll every 5 s (heartbeating the lease on each poll) until done
 """
 
 from __future__ import annotations
@@ -27,10 +28,21 @@ from ..models import (
     Word,
     WorkerTask,
 )
+from ..providers.base import ProviderContext, TranscriptionProvider
 from ..providers.mock import MOCK_PROVIDER_VERSION
 from ..storage import Storage
 from ..tools import Tools
-from .common import StageError, derived_uri, require_source, workdir
+from .common import (
+    StageEnv,
+    StageError,
+    capability_for,
+    derived_uri,
+    poll_until_done,
+    provider_context,
+    require_source,
+    resolve_env,
+    workdir,
+)
 
 DEFAULT_LOCALE = "en-US"
 DETECTION_CONFIDENCE = 0.93
@@ -172,11 +184,42 @@ def _write_waveform(
     return uri
 
 
-def run(task: WorkerTask, storage: Storage, tools: Tools) -> dict[str, object]:
+def _from_provider(
+    result: dict[str, object], has_video: bool
+) -> tuple[list[AnalyzedSpeaker], list[AnalyzedSegment], str, float]:
+    speakers_raw = result.get("speakers")
+    segments_raw = result.get("segments")
+    if not isinstance(speakers_raw, list) or not isinstance(segments_raw, list):
+        raise StageError("PROVIDER_BAD_OUTPUT", "Transcription result had no segments.")
+    speakers = [
+        AnalyzedSpeaker.model_validate({**s, "onCamera": has_video})
+        for s in speakers_raw
+        if isinstance(s, dict)
+    ]
+    segments = [AnalyzedSegment.model_validate(s) for s in segments_raw if isinstance(s, dict)]
+    locale = str(result.get("detectedLocale") or DEFAULT_LOCALE)
+    confidence_raw = result.get("detectionConfidence")
+    confidence = float(confidence_raw) if isinstance(confidence_raw, int | float) else 0.5
+    return speakers, segments, locale, confidence
+
+
+def run(
+    task: WorkerTask, storage: Storage, tools: Tools, env: StageEnv | None = None
+) -> dict[str, object]:
+    env = resolve_env(env, storage, tools)
     params = task.analyzing_params()
     source_uri = require_source(task)
     metadata = params.metadata
     has_video = metadata.video is not None
+
+    provider: TranscriptionProvider | None = None
+    ctx: ProviderContext | None = None
+    handle = None
+    if not env.providers.is_mock:
+        provider = env.providers.transcription
+        ctx = provider_context(task, env.providers.region)
+        handle = provider.transcribe(source_uri, params.declaredLocale, ctx)
+
     with workdir() as wd:
         local = wd / "source.bin"
         storage.download(source_uri, local)
@@ -185,15 +228,31 @@ def run(task: WorkerTask, storage: Storage, tools: Tools) -> dict[str, object]:
         proxy = _write_proxy(task, storage, tools, local, wd, is_wav)
         waveform = _write_waveform(task, storage, tools, local, metadata, is_wav)
 
-    segments = fixture_segments(params.assetId, metadata.durationUs)
+    if provider is None or ctx is None or handle is None:
+        segments = fixture_segments(params.assetId, metadata.durationUs)
+        return AnalyzingOutput(
+            detectedLocale=params.declaredLocale or DEFAULT_LOCALE,
+            detectionConfidence=DETECTION_CONFIDENCE,
+            provider="mock-transcription",
+            providerVersion=MOCK_PROVIDER_VERSION,
+            hasVideo=has_video,
+            proxy=proxy,
+            waveform=waveform,
+            speakers=fixture_speakers(segments, has_video),
+            segments=segments,
+        ).model_dump()
+
+    result = poll_until_done(env, lambda: provider.poll(handle, ctx))
+    speakers, segments, locale, confidence = _from_provider(result, has_video)
+    record = capability_for(provider.capabilities(), locale)
     return AnalyzingOutput(
-        detectedLocale=params.declaredLocale or DEFAULT_LOCALE,
-        detectionConfidence=DETECTION_CONFIDENCE,
-        provider="mock-transcription",
-        providerVersion=MOCK_PROVIDER_VERSION,
+        detectedLocale=locale,
+        detectionConfidence=confidence,
+        provider=record.adapterId,
+        providerVersion=record.version,
         hasVideo=has_video,
         proxy=proxy,
         waveform=waveform,
-        speakers=fixture_speakers(segments, has_video),
+        speakers=speakers,
         segments=segments,
     ).model_dump()

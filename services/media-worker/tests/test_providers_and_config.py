@@ -132,10 +132,23 @@ def test_production_config_fails_closed():
             "MEDIA_BUCKET_SOURCE": "b",
             "STORAGE_DRIVER": "s3",
             "WORKER_TOKEN": "real-secret",
+            "SES_FROM_ADDRESS": "noreply@example.test",
         }
     )
     assert cfg.region == "us-east-1"
     assert cfg.storage_driver == "s3"
+    # M3: production also needs the SES sender for FR-055 notifications
+    with pytest.raises(RuntimeError, match="SES_FROM_ADDRESS"):
+        WorkerConfig.from_env(
+            {
+                "POLYCAST_ENV": "production",
+                "PROVIDER_MODE": "aws",
+                "WORKER_QUEUE_URL": "q",
+                "MEDIA_BUCKET_SOURCE": "b",
+                "STORAGE_DRIVER": "s3",
+                "WORKER_TOKEN": "real-secret",
+            }
+        )
 
 
 def test_development_config_defaults():

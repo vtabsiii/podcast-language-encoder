@@ -52,12 +52,16 @@ class MockTranslationProvider:
     def capabilities(self) -> list[CapabilityRecord]:
         return [_cap("translation")]
 
+    def prompt_version(self) -> str:
+        return MOCK_PROMPT_VERSION
+
     def translate(
         self,
         segments: list[dict[str, object]],
         target_locale: str,
         ctx: ProviderContext,
         hint: str | None = None,
+        source_locale: str | None = None,
     ) -> list[dict[str, object]]:
         shorter = bool(hint) and "shorter" in str(hint).lower()
         out: list[dict[str, object]] = []
@@ -88,6 +92,9 @@ class MockTranslationProvider:
 class MockSpeechProvider:
     def capabilities(self) -> list[CapabilityRecord]:
         return [_cap("speech")]
+
+    def default_voice(self, locale: str) -> str | None:
+        return f"mock-{locale}-1"
 
     def list_voices(self, locale: str) -> list[dict[str, object]]:
         return [

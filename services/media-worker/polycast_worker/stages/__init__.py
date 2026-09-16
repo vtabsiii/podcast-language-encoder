@@ -1,5 +1,6 @@
-"""Stage handlers. Each is `run(task, storage, tools) -> dict` returning the stage's output
-as defined by packages/contracts (`output-<stage>.schema.json`)."""
+"""Stage handlers. Each is `run(task, storage, tools, env=None) -> dict` returning the stage's
+output as defined by packages/contracts (`output-<stage>.schema.json`). `env` carries the
+provider registry and lease hooks; when omitted the local mock set is used."""
 
 from __future__ import annotations
 
@@ -20,9 +21,9 @@ from . import (
     translating,
     validating,
 )
-from .common import StageError
+from .common import StageEnv, StageError
 
-Handler = Callable[[WorkerTask, Storage, Tools], dict[str, object]]
+Handler = Callable[[WorkerTask, Storage, Tools, StageEnv | None], dict[str, object]]
 
 HANDLERS: dict[Stage, Handler] = {
     "VALIDATING": validating.run,
@@ -45,4 +46,4 @@ def handler_for(stage: Stage) -> Handler:
         raise StageError("UNSUPPORTED_STAGE", f"no handler for stage {stage}") from e
 
 
-__all__ = ["HANDLERS", "Handler", "StageError", "handler_for"]
+__all__ = ["HANDLERS", "Handler", "StageEnv", "StageError", "handler_for"]

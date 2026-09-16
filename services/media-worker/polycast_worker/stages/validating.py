@@ -7,7 +7,7 @@ from ..ffprobe import ProbeError, probe
 from ..models import MediaMetadata, ValidatingOutput, WorkerTask
 from ..storage import Storage, StorageUriError, sha256_of_path
 from ..tools import Tools
-from .common import StageError, require_source, workdir
+from .common import StageEnv, StageError, require_source, workdir
 
 SUPPORTED_CONTAINERS = frozenset(
     {"mov", "mp4", "m4a", "matroska", "webm", "wav", "mp3", "flac", "ogg", "aiff", "mpegts"}
@@ -26,7 +26,9 @@ def _reject(code: str) -> StageError:
     return StageError(code, _MESSAGES[code])
 
 
-def run(task: WorkerTask, storage: Storage, tools: Tools) -> dict[str, object]:
+def run(
+    task: WorkerTask, storage: Storage, tools: Tools, env: StageEnv | None = None
+) -> dict[str, object]:
     params = task.validating_params()
     source_uri = require_source(task)
     with workdir() as wd:

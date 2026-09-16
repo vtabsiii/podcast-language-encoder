@@ -81,14 +81,16 @@ arrive with M2.
 
 ## M3 — Real providers behind adapters
 
-- [ ] Amazon Transcribe adapter (word timestamps, diarization) with S3 input/output, no PII redaction bypass
-- [ ] Translation adapter: Amazon Translate baseline; LLM adapter with entity-preservation prompt and duration hint (FR-010, FR-011, FR-013)
-- [ ] Polly TTS adapter (neural/long-form voices) plus the adapter interface for a second TTS vendor
-- [ ] Duration matching worker (FR-022) and remix/loudness worker with ebur128 measurement (FR-023)
-- [ ] Encode via MediaConvert for standard outputs, FFmpeg on Fargate for custom mux
-- [ ] QC workers: coverage, boundary drift, loudness, true peak, caption timing, entity check, frame diff (FR-040)
-- [ ] Notification adapter (SES + in-app) (FR-055)
-- [ ] Contract tests for every adapter against recorded provider responses
+Status: all worker adapters exist behind the provider registry (`services/media-worker/polycast_worker/providers/registry.py`, `PROVIDER_MODE=local|aws`) and are contract-tested against recorded provider responses with `botocore.stub.Stubber`; **none has been run against live AWS from this repository yet**, and every record stays at tier `beta` until the M4 benchmark gate.
+
+- [x] Amazon Transcribe adapter (word timestamps, diarization) with S3 input/output, no PII redaction bypass (`providers/aws/transcribe.py`; job output parsed from a recorded fixture in the real schema; ANALYZING polls with lease heartbeats)
+- [x] Translation adapter: Amazon Translate baseline; LLM adapter with entity-preservation prompt and duration hint (FR-010, FR-011, FR-013) (`providers/aws/translate.py`, `providers/aws/bedrock.py`, `qc/entity_check.py`; glossary terms are an empty list until FR-015)
+- [x] Polly TTS adapter (neural/long-form voices) plus the adapter interface for a second TTS vendor (`providers/aws/polly.py`, default voice table for the 22 seed locales — 5 marked `unavailable`; the `SpeechProvider` Protocol is the vendor interface, no second vendor yet)
+- [x] Duration matching worker (FR-022) and remix/loudness worker with ebur128 measurement (FR-023) (`timing_fit.py`, `providers/ffmpeg.py::AtempoTimingFitter/DubMixer`; verified within ±1 LU in tests)
+- [x] Encode via MediaConvert for standard outputs, FFmpeg on Fargate for custom mux (`providers/aws/mediaconvert.py` selected by `ENCODE_PROVIDER`; FFmpeg encoder in-worker — the Fargate placement itself is M2 infrastructure)
+- [x] QC workers: coverage, boundary drift, loudness, true peak, caption timing, entity check, frame diff (FR-040) (`providers/quality.py`; "frame diff" is a pass-by-construction `frame-preservation` check until a lip-sync render exists in M4; A/V offset also M4)
+- [x] Notification adapter (SES + in-app) (FR-055) (`providers/aws/ses.py`, `providers/inapp.py`, `python -m polycast_worker.notify`; the API does not call it until M5)
+- [x] Contract tests for every adapter against recorded provider responses (`tests/fixtures/providers/`, `tests/test_aws_*.py`, `tests/test_encode_providers.py`, `tests/test_notify.py`, plus `tests/test_aws_e2e_loop.py` driving the whole aws-mode slice with stubs and real ffmpeg)
 
 ## M4 — Lip-sync provider, GPU Batch, benchmark gate
 
