@@ -47,6 +47,7 @@ from .common import (
     translations_by_segment,
     workdir,
 )
+from .lip_syncing import find_lip_sync_video
 
 GENERATOR = f"polycast-media-worker/{__version__}"
 DISCLOSURE = (
@@ -56,6 +57,11 @@ DISCLOSURE = (
 DISCLOSURE_SYNTHETIC = (
     "Dialogue was machine-translated and voiced with a synthetic (stock) voice; "
     "lip sync was not applied. Providers are listed in `models` with their tiers."
+)
+DISCLOSURE_LIP_SYNC = (
+    "Dialogue was machine-translated and voiced with a synthetic (stock) voice, and the "
+    "speaker's mouth movements were re-rendered to match. Providers are listed in `models` "
+    "with their tiers."
 )
 PROVENANCE_FILE = "provenance.json"
 CHECKSUMS_FILE = "checksums.sha256"
@@ -238,6 +244,13 @@ def run(
             translation_ids = list(params.provenance.translationVersionIds)
         else:
             translation_ids = sorted(t.translationVersionId for t in current.values())
+        lip_sync_applied = not providers.is_mock and find_lip_sync_video(task, storage) is not None
+        if providers.is_mock:
+            disclosure = DISCLOSURE
+        elif lip_sync_applied:
+            disclosure = DISCLOSURE_LIP_SYNC
+        else:
+            disclosure = DISCLOSURE_SYNTHETIC
         manifest = ProvenanceManifest(
             generator=GENERATOR,
             generatedAt=now_iso(),
@@ -248,13 +261,13 @@ def run(
             targetLocale=locale,
             sourceSha256=params.sourceSha256,
             syntheticVoice=not providers.is_mock and bool(params.speech),
-            lipSyncApplied=False,
+            lipSyncApplied=lip_sync_applied,
             mock=providers.is_mock,
             models=provenance_models(providers, params),
             segmentCount=len(segments),
             translationVersionIds=translation_ids,
             files=[ManifestFile(fileName=f.name, sha256=f.sha256, byteSize=f.size) for f in files],
-            disclosure=DISCLOSURE if providers.is_mock else DISCLOSURE_SYNTHETIC,
+            disclosure=disclosure,
         )
         prov = wd / PROVENANCE_FILE
         _dump_json(prov, manifest.model_dump())

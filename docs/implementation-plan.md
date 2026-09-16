@@ -101,7 +101,8 @@ Status: all worker adapters exist behind the provider registry (`services/media-
 
 - [ ] Face tracking + active visible speaker worker (FR-006) on GPU Batch
 - [ ] Shot detection (FR-032) and VisibleSpeechSegment builder
-- [ ] Lip-sync adapter Protocol with first vendor/model; mouth-region compositing preserving all other pixels (FR-030, FR-031)
+- [x] First vendor adapter behind the `LipSyncProvider` Protocol: sync.so `lipsync-2` (`services/media-worker/polycast_worker/providers/synclabs.py`, selected by `LIP_SYNC_PROVIDER=synclabs`, mock by default). The `LIP_SYNCING` stage builds the dubbed speech track, submits one whole-episode job over presigned S3 URLs and stores the returned MP4; `ENCODING` takes it as the picture source and `PACKAGING` records `lipSyncApplied`. Contract-tested against a scripted vendor (`tests/test_synclabs.py`); **not yet run against the live sync.so service**, tier stays `beta`
+- [ ] Mouth-region compositing preserving all other pixels (FR-030, FR-031): the vendor returns a full re-encoded frame, so `frame-preservation` cannot pass on lip-synced targets until the worker composites the mouth region back onto the source
 - [ ] Sync confidence measurement and gate (FR-034); occlusion/angle flags (FR-033)
 - [ ] Benchmark harness and corpus per `quality-benchmark.md`; CI job that runs it against a locale and writes ProviderCapability results
 - [ ] First locale promoted to `production` only via the gate

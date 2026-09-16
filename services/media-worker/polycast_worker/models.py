@@ -437,6 +437,8 @@ class LipSyncOutput(ContractModel):
     providerVersion: str
     applied: bool
     renders: list[LipSyncRender]
+    # Whole-episode lip-synced video (real adapters render the episode, not one segment).
+    video: str | None = Field(default=None, pattern=STORAGE_URI_PATTERN)
 
 
 class MixingOutput(ContractModel):

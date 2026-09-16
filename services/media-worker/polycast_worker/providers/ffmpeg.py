@@ -236,13 +236,15 @@ def duck_expression(placements: list[SpeechPlacement]) -> str:
     )
 
 
-def build_dub_filter(placements: list[SpeechPlacement], channels: int) -> str:
+def _sample_format(channels: int) -> str:
     layout = "mono" if channels == 1 else "stereo"
-    fmt = f"aresample={MIX_RATE},aformat=sample_fmts=s16:channel_layouts={layout}"
-    parts = [f"[0:a]{fmt}"]
-    if placements:
-        parts[0] += f",volume={DUCK_GAIN}:enable='{duck_expression(placements)}'"
-    parts[0] += "[bed]"
+    return f"aresample={MIX_RATE},aformat=sample_fmts=s16:channel_layouts={layout}"
+
+
+def _placement_graph(bed: str, placements: list[SpeechPlacement], channels: int) -> str:
+    """`bed` (a complete `[0:a]...[bed]` chain) plus every render delayed to its start."""
+    fmt = _sample_format(channels)
+    parts = [bed]
     labels = ["[bed]"]
     for i, p in enumerate(placements, start=1):
         delay_ms = p.start_us // 1000
@@ -250,6 +252,62 @@ def build_dub_filter(placements: list[SpeechPlacement], channels: int) -> str:
         labels.append(f"[s{i}]")
     parts.append("".join(labels) + f"amix=inputs={len(labels)}:normalize=0:duration=first[mixed]")
     return ";".join(parts)
+
+
+def build_dub_filter(placements: list[SpeechPlacement], channels: int) -> str:
+    bed = f"[0:a]{_sample_format(channels)}"
+    if placements:
+        bed += f",volume={DUCK_GAIN}:enable='{duck_expression(placements)}'"
+    return _placement_graph(bed + "[bed]", placements, channels)
+
+
+def build_speech_track_filter(placements: list[SpeechPlacement], channels: int) -> str:
+    """Renders over a silent bed (input 0 is `anullsrc` cut to the episode length)."""
+    return _placement_graph(f"[0:a]{_sample_format(channels)}[bed]", placements, channels)
+
+
+def build_speech_track(
+    tools: Tools,
+    placements: list[SpeechPlacement],
+    out: Path,
+    *,
+    duration_us: int,
+    channels: int = 1,
+) -> int:
+    """Full-length WAV with each render at its segment start and silence elsewhere.
+
+    This is the "dubbed speech track" an external lip-sync vendor consumes: no original bed,
+    so mouth movements follow the translated dialogue only. Returns the written duration (µs).
+    """
+    if not tools.has_ffmpeg:
+        raise ToolError("ffmpeg is required to build the dubbed speech track", retryable=True)
+    if duration_us <= 0:
+        raise ValueError("speech track duration must be positive")
+    ch = 1 if channels == 1 else 2
+    layout = "mono" if ch == 1 else "stereo"
+    args: list[str | Path] = [
+        "-f",
+        "lavfi",
+        "-t",
+        _us_to_seconds(duration_us),
+        "-i",
+        f"anullsrc=r={MIX_RATE}:cl={layout}",
+    ]
+    for p in placements:
+        args += ["-i", p.wav]
+    args += [
+        "-filter_complex",
+        build_speech_track_filter(placements, ch),
+        "-map",
+        "[mixed]",
+        "-t",
+        _us_to_seconds(duration_us),
+        "-c:a",
+        "pcm_s16le",
+        out,
+    ]
+    tools.run_ffmpeg(args)
+    return wav_duration_us(out)
 
 
 class DubMixer:
