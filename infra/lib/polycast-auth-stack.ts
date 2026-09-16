@@ -3,6 +3,7 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as cr from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
 import * as path from 'path';
 import { tagPolycastStack } from './polycast-common';
@@ -12,6 +13,11 @@ export interface PolycastAuthStackProps extends cdk.StackProps {
   domainPrefix: string;
   /** Web origins used for OAuth callback/logout URLs. Defaults to the local web origin. */
   webOrigins?: string[];
+  /**
+   * Email of the first user. Created with `AdminCreateUser` (invitation email with a
+   * temporary password) the first time the value is set; an existing user is left alone.
+   */
+  bootstrapAdminEmail?: string;
 }
 
 /**
@@ -100,6 +106,40 @@ export class PolycastAuthStack extends cdk.Stack {
     this.userPoolDomain = this.userPool.addDomain('HostedUi', {
       cognitoDomain: { domainPrefix: props.domainPrefix },
     });
+
+    if (props.bootstrapAdminEmail) {
+      const email = props.bootstrapAdminEmail.trim().toLowerCase();
+      new cr.AwsCustomResource(this, 'BootstrapAdmin', {
+        resourceType: 'Custom::PolycastBootstrapUser',
+        onCreate: {
+          service: 'CognitoIdentityServiceProvider',
+          action: 'adminCreateUser',
+          parameters: {
+            UserPoolId: this.userPool.userPoolId,
+            Username: email,
+            UserAttributes: [
+              { Name: 'email', Value: email },
+              { Name: 'email_verified', Value: 'true' },
+            ],
+            DesiredDeliveryMediums: ['EMAIL'],
+          },
+          physicalResourceId: cr.PhysicalResourceId.of(`polycast-bootstrap-user:${email}`),
+          // Re-running a deploy must not fail on the user that already exists.
+          ignoreErrorCodesMatching: 'UsernameExistsException',
+        },
+        // A changed email creates the new user; the previous one is kept (never deleted here).
+        onUpdate: undefined,
+        policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+          resources: [this.userPool.userPoolArn],
+        }),
+        installLatestAwsSdk: false,
+        logGroup: new logs.LogGroup(this, 'BootstrapAdminLogs', {
+          retention: logs.RetentionDays.ONE_MONTH,
+          removalPolicy: cdk.RemovalPolicy.DESTROY,
+        }),
+      });
+      new cdk.CfnOutput(this, 'BootstrapAdminEmail', { value: email });
+    }
 
     new cdk.CfnOutput(this, 'UserPoolId', { value: this.userPool.userPoolId });
     new cdk.CfnOutput(this, 'UserPoolClientId', { value: this.userPoolClient.userPoolClientId });

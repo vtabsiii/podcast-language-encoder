@@ -12,6 +12,7 @@ export interface PolycastFixtureOptions {
   cloudFrontPublicKeyPem?: string;
   monthlyBudgetUsd?: number;
   sesFromAddress?: string;
+  bootstrapAdminEmail?: string;
 }
 
 /**
@@ -31,6 +32,7 @@ export function buildPolycastApp(options: PolycastFixtureOptions = {}) {
   const auth = new PolycastAuthStack(app, 'PolycastAuth', {
     domainPrefix: 'polycast-test',
     webOrigins,
+    bootstrapAdminEmail: options.bootstrapAdminEmail,
   });
   const buckets = {
     quarantine: storage.quarantineBucket,

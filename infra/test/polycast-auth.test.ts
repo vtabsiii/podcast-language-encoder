@@ -108,3 +108,39 @@ describe('pre-token-generation handler', () => {
     });
   });
 });
+
+describe('PolycastAuthStack with a bootstrap admin', () => {
+  test('creates the first user with an invitation email and tolerates an existing one', () => {
+    const { auth } = buildPolycastApp({ bootstrapAdminEmail: 'Owner@Example.test' });
+    const template = Template.fromStack(auth);
+    // The SDK call is serialized with the pool id token inside, hence the Fn::Join.
+    const [resource] = Object.values(template.findResources('Custom::PolycastBootstrapUser'));
+    const call = JSON.stringify(resource.Properties.Create);
+    for (const fragment of [
+      '"service":"CognitoIdentityServiceProvider"',
+      '"action":"adminCreateUser"',
+      '"Username":"owner@example.test"',
+      '"DesiredDeliveryMediums":["EMAIL"]',
+      '{"Name":"email_verified","Value":"true"}',
+      '"ignoreErrorCodesMatching":"UsernameExistsException"',
+    ]) {
+      expect(call).toContain(fragment.replace(/"/g, '\\"'));
+    }
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: 'cognito-idp:AdminCreateUser',
+            Resource: Match.objectLike({ 'Fn::GetAtt': Match.arrayWith(['Arn']) }),
+          }),
+        ]),
+      }),
+    });
+    template.hasOutput('BootstrapAdminEmail', { Value: 'owner@example.test' });
+  });
+
+  test('no bootstrap user without the context key', () => {
+    const { auth } = buildPolycastApp();
+    Template.fromStack(auth).resourceCountIs('Custom::PolycastBootstrapUser', 0);
+  });
+});
