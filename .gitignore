@@ -1,26 +1,48 @@
-# Node
+# Dependencies
 node_modules/
-npm-debug.log*
+.pnpm-store/
 
-# TypeScript build output (sources are .ts; keep compiled output out of git)
-*.js
-!jest.config.js
-*.d.ts
+# Build output
+dist/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+infra/**/*.js
+infra/**/*.d.ts
+!infra/jest.config.js
 
 # CDK
 cdk.out/
 cdk.context.json
 .cdk.staging/
 
-# Local environment / credentials — never commit these
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environment / credentials: never commit these
 .env
 .env.*
+!.env.example
 *.pem
+
+# Local media and fixtures larger than a few hundred KB do not belong in git
+*.mp4
+*.mov
+*.wav
+*.mp3
+!services/media-worker/tests/fixtures/*.wav
 
 # Editors / OS
 .vscode/
 .idea/
 .DS_Store
+*.log
 
 # Local Claude Code settings (shared settings.json is committed; local overrides are not)
 .claude/settings.local.json

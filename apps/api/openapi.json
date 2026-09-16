@@ -1,0 +1,297 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Polycast Studio API",
+    "version": "1.0.0",
+    "description": "Control-plane API. All routes are tenant-scoped by the authenticated principal; organization ids in request bodies are never trusted."
+  },
+  "components": {
+    "schemas": {}
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Liveness probe",
+        "tags": [
+          "ops"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/capabilities/languages": {
+      "get": {
+        "summary": "List locales and their capability tiers for a region",
+        "tags": [
+          "capabilities"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "default": "us-east-1"
+            },
+            "in": "query",
+            "name": "region",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "transcription",
+                "translation",
+                "speech",
+                "lipSync"
+              ]
+            },
+            "in": "query",
+            "name": "kind",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "production",
+                "beta"
+              ]
+            },
+            "in": "query",
+            "name": "minTier",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "region": {
+                      "type": "string"
+                    },
+                    "priorityScoreVersion": {
+                      "type": "string"
+                    },
+                    "locales": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "locale": {
+                            "type": "string",
+                            "pattern": "^[a-z]{2}-[A-Z0-9]{2,3}$"
+                          },
+                          "language": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 2
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "nativeName": {
+                            "type": "string"
+                          },
+                          "direction": {
+                            "type": "string",
+                            "enum": [
+                              "ltr",
+                              "rtl"
+                            ]
+                          },
+                          "requiresLocaleChoice": {
+                            "type": "boolean"
+                          },
+                          "priority": {
+                            "type": "integer",
+                            "exclusiveMinimum": true,
+                            "minimum": 0
+                          },
+                          "tiers": {
+                            "type": "object",
+                            "required": [
+                              "transcription",
+                              "translation",
+                              "speech",
+                              "lipSync"
+                            ],
+                            "properties": {
+                              "transcription": {
+                                "type": "string",
+                                "enum": [
+                                  "production",
+                                  "beta",
+                                  "unavailable"
+                                ]
+                              },
+                              "translation": {
+                                "type": "string",
+                                "enum": [
+                                  "production",
+                                  "beta",
+                                  "unavailable"
+                                ]
+                              },
+                              "speech": {
+                                "type": "string",
+                                "enum": [
+                                  "production",
+                                  "beta",
+                                  "unavailable"
+                                ]
+                              },
+                              "lipSync": {
+                                "type": "string",
+                                "enum": [
+                                  "production",
+                                  "beta",
+                                  "unavailable"
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "note": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "locale",
+                          "language",
+                          "displayName",
+                          "nativeName",
+                          "direction",
+                          "requiresLocaleChoice",
+                          "priority",
+                          "tiers"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "region",
+                    "priorityScoreVersion",
+                    "locales"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "NOT_FOUND",
+                        "FORBIDDEN",
+                        "UNAUTHENTICATED",
+                        "CONFLICT",
+                        "ILLEGAL_TRANSITION",
+                        "CONSENT_REQUIRED",
+                        "CAPABILITY_UNAVAILABLE",
+                        "BUDGET_EXCEEDED",
+                        "PROVIDER_UNAVAILABLE",
+                        "INTERNAL"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "default": []
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "correlationId",
+                    "retryable"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "tags": [
+    {
+      "name": "ops"
+    },
+    {
+      "name": "capabilities"
+    }
+  ]
+}

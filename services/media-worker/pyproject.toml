@@ -1,0 +1,43 @@
+[project]
+name = "polycast-media-worker"
+version = "0.1.0"
+description = "Polycast Studio media-plane worker: probe/validate, proxy, mix, encode, QC, package. ML inference stays behind provider adapters."
+requires-python = ">=3.11"
+dependencies = [
+  "pydantic>=2.10",
+  "jsonschema>=4.23",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "pytest-cov>=6.0",
+  "ruff>=0.8",
+  "mypy>=1.13",
+]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["polycast_worker*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "S"]
+ignore = ["S603", "S607"]  # subprocess use is deliberate and argument lists are constructed, never shell strings
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,100 +1,91 @@
-# Podcast Language Encoder
+# Polycast Studio
 
-Serverless AWS pipeline that takes a podcast episode, transcribes it, translates the
-transcript into other languages, and re-voices each translation as a new audio file.
+Multi-tenant podcast localization on AWS. Upload an episode once, confirm speakers and
+transcript, choose target languages and voices, and get back publication-ready localized
+audio/video with translated captions, preserved production quality, and quality-scored lip
+sync for visible speakers. Results are labelled **studio-grade**, never "perfect": every
+target ships with measurable QC evidence and a human review path.
 
-```
-upload  s3://<input-bucket>/episodes/<episode>.mp3
-   │
-   ▼  EventBridge "Object Created"
-Step Functions state machine
-   ├─ Amazon Transcribe   StartTranscriptionJob (auto language identification), poll until done
-   ├─ Lambda              read transcript → Amazon Translate per target language
-   │                      → write transcript.txt → start Amazon Polly synthesis tasks
-   └─ poll Polly          until every audio file is written
-   │
-   ▼
-s3://<output-bucket>/<episode>/
-   ├─ manifest.json
-   ├─ <source-lang>/transcript.txt
-   └─ <lang>/transcript.txt, audio-part001-<task>.mp3, ...
-```
+> **Status: milestone M0 (scaffold).** The monorepo, domain model, contracts, API skeleton,
+> web shell, worker skeleton, CDK, CI, and documentation are in place. No provider does real
+> work yet; every adapter is a labelled `Mock*` registered as tier `unavailable`. See
+> [docs/implementation-plan.md](docs/implementation-plan.md) for what comes next.
 
-Everything is defined with the [AWS CDK](https://docs.aws.amazon.com/cdk/) in TypeScript.
-Nothing is clicked together in the console; the console is only used once to bootstrap
-the account (see [docs/aws-setup.md](docs/aws-setup.md)).
+The original serverless encoder (S3 → Step Functions → Transcribe → Lambda(Translate +
+Polly) → S3) is retained in `infra/` as the **legacy encoder** stack and still deploys on
+push to `main`. Its setup guide is [docs/aws-setup.md](docs/aws-setup.md).
 
-## Repository layout
+## Prerequisites
 
-| Path | What it is |
-| --- | --- |
-| `bin/podcast-language-encoder.ts` | CDK app entry point, instantiates both stacks |
-| `lib/podcast-language-encoder-stack.ts` | The pipeline: buckets, Step Functions, Lambda, EventBridge rule |
-| `lib/github-oidc-stack.ts` | One-time stack: GitHub Actions OIDC provider + deploy role |
-| `lambda/process-transcript/` | Lambda that translates the transcript and starts Polly tasks |
-| `test/` | Jest tests: CDK assertions + Lambda unit tests |
-| `.github/workflows/ci.yml` | Build, test, `cdk synth` on every PR |
-| `.github/workflows/deploy.yml` | `cdk deploy` on push to `main`, authenticated with OIDC |
-| `docs/aws-setup.md` | Step-by-step AWS account bootstrap (console + CloudShell) |
-| `CLAUDE.md` | Notes for Claude Code sessions working in this repo |
+- Node 22 (`.nvmrc`) and pnpm 10 (`corepack enable` or `npm i -g pnpm`)
+- Python 3.11+ (3.12 targeted) for `services/media-worker`
+- Docker (for local Postgres + MinIO via `docker-compose.yml`)
+- `ffprobe`/`ffmpeg` for real media probing (unit tests run without it)
+- AWS credentials only for `cdk deploy`; everything else works offline
 
-## Quick start (local)
+## Layout
 
-```bash
-npm install
-npm run build
-npm test
-npx cdk synth          # no AWS credentials needed
-```
+| Path                    | What                                                                                   |
+| ----------------------- | -------------------------------------------------------------------------------------- |
+| `apps/web`              | Next.js App Router UI (dashboard, wizard, processing, review studio, deliverables)      |
+| `apps/api`              | Fastify + Zod + OpenAPI control-plane API at `/api/v1` (Swagger UI at `/docs`)          |
+| `packages/domain`       | Entities, job state machine, capability registry, µs time base, roles, errors, UUID v7 |
+| `packages/contracts`    | Zod schemas for API/events/worker messages; emits JSON Schema to `schema/` for Python  |
+| `packages/ui`           | Design tokens and accessible primitives                                                |
+| `services/media-worker` | Python worker: probe/validate, proxy, mix, encode, QC, package; provider Protocols      |
+| `infra`                 | AWS CDK stacks (legacy encoder today; Polycast stacks arrive in M2)                    |
+| `docs`                  | Spec, plan, architecture, threat model, privacy, benchmark, ADRs, runbooks, traceability |
 
-With AWS credentials configured (`aws configure`, SSO, or env vars):
+## Architecture in one paragraph
 
-```bash
-npx cdk bootstrap                       # once per account/region
-npm run deploy:oidc                     # once; prints AWS_DEPLOY_ROLE_ARN for GitHub
-npm run deploy                          # the pipeline
-```
+A **control plane** (web, API, Aurora PostgreSQL, Cognito, Step Functions, EventBridge/SQS)
+owns tenants, projects, jobs, reviews, and billing. A **media plane** (private S3, Fargate
+CPU workers, Batch GPU workers, MediaConvert/FFmpeg) does the work. A parent workflow
+analyzes the source once, then fans out an immutable **TargetJob** per locale. Every
+provider (transcription, translation, speech, lip sync, encode, quality) sits behind an
+adapter and is selectable only at the tier the **capability registry** records for that
+locale/region. Details: [docs/architecture.md](docs/architecture.md).
 
-Then upload an episode and watch the state machine run:
+## Run locally
 
 ```bash
-aws s3 cp my-episode.mp3 s3://<InputBucketName>/episodes/my-episode.mp3
-aws stepfunctions list-executions --state-machine-arn <StateMachineArn>
-aws s3 ls s3://<OutputBucketName>/my-episode/ --recursive
+pnpm install
+docker compose up -d                      # Postgres :5432, MinIO :9000/:9001
+cp .env.example .env
+pnpm build                                # also emits packages/contracts/schema/*.json
+pnpm --filter @polycast/api dev           # http://127.0.0.1:4000/docs
+pnpm --filter @polycast/web dev           # http://localhost:3000
 ```
 
-Episode filenames must only contain letters, digits, `.`, `_` and `-` (they become the
-Transcribe job name). The part before the first `.` becomes the output folder name.
+Python worker:
 
-## Configuration
+```bash
+cd services/media-worker
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+```
 
-Set in `cdk.json` `context`, or override on the command line with `-c key=value`:
+## Verify
 
-| Key | Default | Purpose |
-| --- | --- | --- |
-| `targetLanguages` | `es,fr,de,pt` | ISO 639-1 codes to translate and re-voice into. The detected source language is skipped. |
-| `githubOwner` / `githubRepo` | `vtabsiii` / `podcast-language-encoder` | Repository the OIDC deploy role trusts |
-| `githubOidcProviderArn` | unset | Reuse an existing GitHub OIDC provider in the account instead of creating one |
+```bash
+pnpm format:check && pnpm build && pnpm lint && pnpm typecheck && pnpm test && pnpm synth
+cd services/media-worker && ruff check . && mypy polycast_worker && pytest
+```
 
-Supported target languages (voice map in `lambda/process-transcript/index.ts`):
-en, es, fr, de, pt, it, ja, ko, zh, hi, ar, nl, pl, sv, tr.
+CI runs exactly this (`.github/workflows/ci.yml`) on Node 22 and Python 3.11 + 3.12.
 
-## GitHub → AWS wiring
+## Deploy
 
-The `Deploy` workflow assumes an IAM role via GitHub OIDC. No AWS keys are stored in
-GitHub. Required repository settings (Settings → Secrets and variables → Actions → Variables):
+Deploys go through GitHub Actions with a short-lived OIDC role; no AWS keys are stored.
+`Deploy` runs on push to `main` and currently deploys only the legacy encoder stack. The dev
+account is `559315537226` / `us-east-1` ([docs/assumptions.md](docs/assumptions.md)).
+Polycast stacks are added in milestone M2.
 
-| Variable | Value |
-| --- | --- |
-| `AWS_DEPLOY_ROLE_ARN` | `DeployRoleArn` output of the `PodcastLanguageEncoderGithubOidc` stack |
-| `AWS_REGION` | Region you bootstrapped, e.g. `us-east-1` |
+## Key documents
 
-The workflow uses the `production` environment; create it under Settings → Environments
-(optionally with required reviewers) so deploys can be gated.
-
-## Cost notes
-
-The pipeline is pay-per-use: Transcribe, Translate and Polly are billed per minute / per
-character. A one-hour episode into four languages is roughly one hour of Transcribe,
-about 40k characters × 4 of Translate, and about 40k characters × 4 of neural Polly.
-Buckets are retained on `cdk destroy` so you never lose episodes by accident.
+- [docs/product-spec.md](docs/product-spec.md): controlling requirements (FR/NFR ids)
+- [docs/implementation-plan.md](docs/implementation-plan.md): milestones and definition of done
+- [docs/architecture.md](docs/architecture.md): C4 diagrams, state machine, ER, events, invalidation
+- [docs/threat-model.md](docs/threat-model.md), [docs/privacy-and-consent.md](docs/privacy-and-consent.md)
+- [docs/quality-benchmark.md](docs/quality-benchmark.md): how a language earns Production
+- [docs/adr/](docs/adr/), [docs/runbooks/](docs/runbooks/), [docs/traceability.md](docs/traceability.md)

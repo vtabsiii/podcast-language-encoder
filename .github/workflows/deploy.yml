@@ -1,8 +1,9 @@
 name: Deploy
 
-# Deploys the application stack to AWS on every push to main.
+# Deploys the legacy encoder stack to AWS on every push to main.
 # Authentication is via GitHub OIDC -> the role created by the
-# PodcastLanguageEncoderGithubOidc stack (see README "One-time AWS setup").
+# PodcastLanguageEncoderGithubOidc stack (see docs/aws-setup.md).
+# Polycast Studio stacks are added to this workflow in milestone M2.
 
 on:
   push:
@@ -14,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  id-token: write   # required to request the OIDC token
+  id-token: write # required to request the OIDC token
   contents: read
 
 jobs:
@@ -26,15 +27,15 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
     steps:
       - uses: actions/checkout@v4
-
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
-      - run: npm run build
-      - run: npm test -- --ci
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @polycast/infra build
+      - run: pnpm --filter @polycast/infra test -- --ci
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -43,10 +44,13 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: cdk diff
+        working-directory: infra
         run: npx cdk diff PodcastLanguageEncoder || true
 
       - name: cdk deploy
+        working-directory: infra
         run: npx cdk deploy PodcastLanguageEncoder --require-approval never --outputs-file cdk-outputs.json
 
       - name: Show stack outputs
+        working-directory: infra
         run: cat cdk-outputs.json

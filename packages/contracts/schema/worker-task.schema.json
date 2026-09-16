@@ -1,0 +1,72 @@
+{
+  "$ref": "#/definitions/worker-task",
+  "definitions": {
+    "worker-task": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "jobId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "targetJobId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stage": {
+          "type": "string",
+          "enum": ["VALIDATING", "ANALYZING", "MIXING", "ENCODING", "TARGET_QA", "PACKAGING"]
+        },
+        "idempotencyKey": {
+          "type": "string",
+          "minLength": 8
+        },
+        "correlationId": {
+          "type": "string"
+        },
+        "inputAssetIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "taskToken": {
+          "type": ["string", "null"]
+        }
+      },
+      "required": [
+        "taskId",
+        "organizationId",
+        "jobId",
+        "targetJobId",
+        "stage",
+        "idempotencyKey",
+        "correlationId",
+        "inputAssetIds",
+        "parameters",
+        "taskToken"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
