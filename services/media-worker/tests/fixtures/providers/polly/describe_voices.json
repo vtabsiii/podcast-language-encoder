@@ -1,0 +1,28 @@
+{
+  "service": "polly",
+  "operation": "describe_voices",
+  "expected_params": {
+    "Engine": "neural",
+    "LanguageCode": "es-MX"
+  },
+  "response": {
+    "Voices": [
+      {
+        "Gender": "Female",
+        "Id": "Mia",
+        "LanguageCode": "es-MX",
+        "LanguageName": "Mexican Spanish",
+        "Name": "Mia",
+        "SupportedEngines": ["neural", "standard"]
+      },
+      {
+        "Gender": "Male",
+        "Id": "Andres",
+        "LanguageCode": "es-MX",
+        "LanguageName": "Mexican Spanish",
+        "Name": "Andrés",
+        "SupportedEngines": ["generative", "neural"]
+      }
+    ]
+  }
+}

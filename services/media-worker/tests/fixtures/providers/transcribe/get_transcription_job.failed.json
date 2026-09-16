@@ -1,0 +1,11 @@
+{
+  "service": "transcribe",
+  "operation": "get_transcription_job",
+  "response": {
+    "TranscriptionJob": {
+      "TranscriptionJobName": "<JOB_NAME>",
+      "TranscriptionJobStatus": "FAILED",
+      "FailureReason": "The media format that you specified isn't supported."
+    }
+  }
+}

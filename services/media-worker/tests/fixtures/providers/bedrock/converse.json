@@ -1,0 +1,26 @@
+{
+  "service": "bedrock",
+  "client": "bedrock-runtime",
+  "operation": "converse",
+  "response": {
+    "output": {
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "text": "[{\"segmentId\": \"<SEG_1>\", \"adaptedText\": \"Bienvenidos de nuevo al programa, hoy hablamos de cómo se hacen los podcasts.\", \"literalText\": \"Bienvenidos de vuelta al show, hoy estamos hablando de cómo se hacen los podcasts.\"}, {\"segmentId\": \"<SEG_2>\", \"adaptedText\": \"La mayoría planea el guion del episodio antes de grabar.\", \"literalText\": null}, {\"segmentId\": \"<SEG_3>\", \"adaptedText\": \"Visita polycast.example.com y escucha 3 episodios gratis.\", \"literalText\": \"Visita polycast.example.com para 3 episodios gratis.\"}]"
+          }
+        ]
+      }
+    },
+    "stopReason": "end_turn",
+    "usage": {
+      "inputTokens": 412,
+      "outputTokens": 96,
+      "totalTokens": 508
+    },
+    "metrics": {
+      "latencyMs": 843
+    }
+  }
+}

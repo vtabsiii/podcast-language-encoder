@@ -15,7 +15,11 @@
       "Bash(npx tsc:*)",
       "Bash(pytest:*)",
       "Bash(ruff:*)",
-      "Bash(mypy:*)"
+      "Bash(mypy:*)",
+      "Bash(pnpm e2e)",
+      "Bash(pnpm dev)",
+      "Bash(npx playwright:*)",
+      "Bash(pnpm exec playwright:*)"
     ]
   }
 }

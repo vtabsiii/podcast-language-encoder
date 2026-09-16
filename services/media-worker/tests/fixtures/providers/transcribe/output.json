@@ -1,0 +1,615 @@
+{
+  "jobName": "polycast-fixture",
+  "accountId": "123456789012",
+  "status": "COMPLETED",
+  "results": {
+    "language_code": "en-US",
+    "language_identification": [
+      {
+        "code": "en-US",
+        "score": "0.9834"
+      },
+      {
+        "code": "en-GB",
+        "score": "0.0166"
+      }
+    ],
+    "transcripts": [
+      {
+        "transcript": "Welcome back to the show, today we are talking about how podcasts get made. Most producers start by planning the episode outline before recording anything. Visit polycast.example.com for 3 free episodes."
+      }
+    ],
+    "speaker_labels": {
+      "channel_label": "ch_0",
+      "speakers": 2,
+      "segments": [
+        {
+          "start_time": "0.00",
+          "end_time": "4.15",
+          "speaker_label": "spk_0",
+          "items": [
+            {
+              "start_time": "0.00",
+              "end_time": "0.25",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "0.30",
+              "end_time": "0.55",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "0.60",
+              "end_time": "0.85",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "0.90",
+              "end_time": "1.15",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "1.20",
+              "end_time": "1.45",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "1.50",
+              "end_time": "1.75",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "1.80",
+              "end_time": "2.05",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "2.10",
+              "end_time": "2.35",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "2.40",
+              "end_time": "2.65",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "2.70",
+              "end_time": "2.95",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "3.00",
+              "end_time": "3.25",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "3.30",
+              "end_time": "3.55",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "3.60",
+              "end_time": "3.85",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "3.90",
+              "end_time": "4.15",
+              "speaker_label": "spk_0"
+            }
+          ]
+        },
+        {
+          "start_time": "4.90",
+          "end_time": "9.25",
+          "speaker_label": "spk_1",
+          "items": [
+            {
+              "start_time": "4.90",
+              "end_time": "5.25",
+              "speaker_label": "spk_1"
+            },
+            {
+              "start_time": "5.30",
+              "end_time": "5.65",
+              "speaker_label": "spk_1"
+            },
+            {
+              "start_time": "5.70",
+              "end_time": "6.05",
+              "speaker_label": "spk_1"
+            },
+            {
+              "start_time": "6.10",
+              "end_time": "6.45",
+              "speaker_label": "spk_1"
+            },
+            {
+              "start_time": "6.50",
+              "end_time": "6.85",
+              "speaker_label": "spk_1"
+            },
+            {
+              "start_time": "6.90",
+              "end_time": "7.25",
+              "speaker_label": "spk_1"
+            },
+            {
+              "start_time": "7.30",
+              "end_time": "7.65",
+              "speaker_label": "spk_1"
+            },
+            {
+              "start_time": "7.70",
+              "end_time": "8.05",
+              "speaker_label": "spk_1"
+            },
+            {
+              "start_time": "8.10",
+              "end_time": "8.45",
+              "speaker_label": "spk_1"
+            },
+            {
+              "start_time": "8.50",
+              "end_time": "8.85",
+              "speaker_label": "spk_1"
+            },
+            {
+              "start_time": "8.90",
+              "end_time": "9.25",
+              "speaker_label": "spk_1"
+            }
+          ]
+        },
+        {
+          "start_time": "9.60",
+          "end_time": "11.95",
+          "speaker_label": "spk_0",
+          "items": [
+            {
+              "start_time": "9.60",
+              "end_time": "9.95",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "10.00",
+              "end_time": "10.35",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "10.40",
+              "end_time": "10.75",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "10.80",
+              "end_time": "11.15",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "11.20",
+              "end_time": "11.55",
+              "speaker_label": "spk_0"
+            },
+            {
+              "start_time": "11.60",
+              "end_time": "11.95",
+              "speaker_label": "spk_0"
+            }
+          ]
+        }
+      ]
+    },
+    "items": [
+      {
+        "type": "pronunciation",
+        "start_time": "0.00",
+        "end_time": "0.25",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "Welcome"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "0.30",
+        "end_time": "0.55",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "back"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "0.60",
+        "end_time": "0.85",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "to"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "0.90",
+        "end_time": "1.15",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "the"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "1.20",
+        "end_time": "1.45",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "show"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "punctuation",
+        "alternatives": [
+          {
+            "confidence": "0.0",
+            "content": ","
+          }
+        ]
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "1.50",
+        "end_time": "1.75",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "today"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "1.80",
+        "end_time": "2.05",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "we"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "2.10",
+        "end_time": "2.35",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "are"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "2.40",
+        "end_time": "2.65",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "talking"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "2.70",
+        "end_time": "2.95",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "about"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "3.00",
+        "end_time": "3.25",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "how"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "3.30",
+        "end_time": "3.55",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "podcasts"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "3.60",
+        "end_time": "3.85",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "get"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "3.90",
+        "end_time": "4.15",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "made"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "punctuation",
+        "alternatives": [
+          {
+            "confidence": "0.0",
+            "content": "."
+          }
+        ]
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "4.90",
+        "end_time": "5.25",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "Most"
+          }
+        ],
+        "speaker_label": "spk_1"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "5.30",
+        "end_time": "5.65",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "producers"
+          }
+        ],
+        "speaker_label": "spk_1"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "5.70",
+        "end_time": "6.05",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "start"
+          }
+        ],
+        "speaker_label": "spk_1"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "6.10",
+        "end_time": "6.45",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "by"
+          }
+        ],
+        "speaker_label": "spk_1"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "6.50",
+        "end_time": "6.85",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "planning"
+          }
+        ],
+        "speaker_label": "spk_1"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "6.90",
+        "end_time": "7.25",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "the"
+          }
+        ],
+        "speaker_label": "spk_1"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "7.30",
+        "end_time": "7.65",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "episode"
+          }
+        ],
+        "speaker_label": "spk_1"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "7.70",
+        "end_time": "8.05",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "outline"
+          }
+        ],
+        "speaker_label": "spk_1"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "8.10",
+        "end_time": "8.45",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "before"
+          }
+        ],
+        "speaker_label": "spk_1"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "8.50",
+        "end_time": "8.85",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "recording"
+          }
+        ],
+        "speaker_label": "spk_1"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "8.90",
+        "end_time": "9.25",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "anything"
+          }
+        ],
+        "speaker_label": "spk_1"
+      },
+      {
+        "type": "punctuation",
+        "alternatives": [
+          {
+            "confidence": "0.0",
+            "content": "."
+          }
+        ]
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "9.60",
+        "end_time": "9.95",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "Visit"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "10.00",
+        "end_time": "10.35",
+        "alternatives": [
+          {
+            "confidence": "0.93",
+            "content": "polycast.example.com"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "10.40",
+        "end_time": "10.75",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "for"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "10.80",
+        "end_time": "11.15",
+        "alternatives": [
+          {
+            "confidence": "0.93",
+            "content": "3"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "11.20",
+        "end_time": "11.55",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "free"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "pronunciation",
+        "start_time": "11.60",
+        "end_time": "11.95",
+        "alternatives": [
+          {
+            "confidence": "0.99",
+            "content": "episodes"
+          }
+        ],
+        "speaker_label": "spk_0"
+      },
+      {
+        "type": "punctuation",
+        "alternatives": [
+          {
+            "confidence": "0.0",
+            "content": "."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -5,3 +5,6 @@ export * from './errors/domain-error.js';
 export * from './ids/uuidv7.js';
 export * from './roles.js';
 export * from './entities.js';
+export * from './invalidation/graph.js';
+export * from './quotas.js';
+export * from './estimate.js';

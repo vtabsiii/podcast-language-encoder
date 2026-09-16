@@ -1,0 +1,8 @@
+{
+  "name": "@polycast/media-worker",
+  "private": true,
+  "scripts": {
+    "dev": "sh -c '. .venv/bin/activate && python -m polycast_worker --api-url ${API_BASE_URL:-http://127.0.0.1:4000}'",
+    "test:py": "sh -c '. .venv/bin/activate && ruff check . && mypy polycast_worker && pytest -q'"
+  }
+}

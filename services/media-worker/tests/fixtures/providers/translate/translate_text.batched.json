@@ -1,0 +1,20 @@
+{
+  "service": "translate",
+  "operation": "translate_text",
+  "expected_params": {
+    "Text": "Welcome back to the show, today we are talking about how podcasts get made.\nMost producers start by planning the episode outline before recording anything.\nVisit polycast.example.com for 3 free episodes.",
+    "SourceLanguageCode": "en",
+    "TargetLanguageCode": "de",
+    "Settings": {
+      "Formality": "INFORMAL"
+    }
+  },
+  "response": {
+    "TranslatedText": "Willkommen zurück zur Show, heute sprechen wir darüber, wie Podcasts entstehen.\nDie meisten Produzenten planen zuerst die Episodenstruktur, bevor sie etwas aufnehmen.\nBesuche polycast.example.com für 3 kostenlose Episoden.",
+    "SourceLanguageCode": "en",
+    "TargetLanguageCode": "de",
+    "AppliedSettings": {
+      "Formality": "INFORMAL"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "$ref": "#/definitions/output-timing",
+  "definitions": {
+    "output-timing": {
+      "type": "object",
+      "properties": {
+        "fits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "segmentId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "strategy": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "rate",
+                  "boundary-shift",
+                  "retranslate"
+                ]
+              },
+              "timeStretchRatio": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "boundaryShiftUs": {
+                "type": "integer"
+              },
+              "fits": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "segmentId",
+              "strategy",
+              "timeStretchRatio",
+              "boundaryShiftUs",
+              "fits"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "fits"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

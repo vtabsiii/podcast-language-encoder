@@ -1,0 +1,29 @@
+{
+  "service": "mediaconvert",
+  "operation": "get_job",
+  "expected_params": {
+    "Id": "1726480000000-abc123"
+  },
+  "response": {
+    "Job": {
+      "Id": "1726480000000-abc123",
+      "Role": "<ROLE_ARN>",
+      "Status": "COMPLETE",
+      "JobPercentComplete": 100,
+      "Settings": {},
+      "OutputGroupDetails": [
+        {
+          "OutputDetails": [
+            {
+              "DurationInMs": 12000,
+              "VideoDetails": {
+                "WidthInPx": 1920,
+                "HeightInPx": 1080
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

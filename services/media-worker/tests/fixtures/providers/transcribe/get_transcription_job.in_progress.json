@@ -1,0 +1,11 @@
+{
+  "service": "transcribe",
+  "operation": "get_transcription_job",
+  "response": {
+    "TranscriptionJob": {
+      "TranscriptionJobName": "<JOB_NAME>",
+      "TranscriptionJobStatus": "IN_PROGRESS",
+      "IdentifyLanguage": true
+    }
+  }
+}

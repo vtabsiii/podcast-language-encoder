@@ -1,0 +1,61 @@
+{
+  "$ref": "#/definitions/output-lipsync",
+  "definitions": {
+    "output-lipsync": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "providerVersion": {
+          "type": "string"
+        },
+        "applied": {
+          "type": "boolean"
+        },
+        "renders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "segmentId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "syncConfidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "video": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^(s3|local):\\/\\/[a-z0-9.-]+\\/.+$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "segmentId",
+              "syncConfidence",
+              "video"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "provider",
+        "providerVersion",
+        "applied",
+        "renders"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

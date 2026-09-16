@@ -1,0 +1,14 @@
+{
+  "service": "mediaconvert",
+  "operation": "create_job",
+  "response": {
+    "Job": {
+      "Id": "1726480000000-abc123",
+      "Arn": "arn:aws:mediaconvert:us-east-1:123456789012:jobs/1726480000000-abc123",
+      "Role": "<ROLE_ARN>",
+      "Queue": "<QUEUE_ARN>",
+      "Status": "SUBMITTED",
+      "Settings": {}
+    }
+  }
+}

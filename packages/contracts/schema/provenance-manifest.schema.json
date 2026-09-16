@@ -1,0 +1,158 @@
+{
+  "$ref": "#/definitions/provenance-manifest",
+  "definitions": {
+    "provenance-manifest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "generator": {
+          "type": "string"
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "jobId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "targetJobId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "projectId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sourceLocale": {
+          "type": "string",
+          "pattern": "^[a-z]{2}-[A-Z0-9]{2,3}$"
+        },
+        "targetLocale": {
+          "type": "string",
+          "pattern": "^[a-z]{2}-[A-Z0-9]{2,3}$"
+        },
+        "sourceSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "syntheticVoice": {
+          "type": "boolean"
+        },
+        "lipSyncApplied": {
+          "type": "boolean"
+        },
+        "mock": {
+          "type": "boolean"
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "capability": {
+                "type": "string",
+                "enum": [
+                  "transcription",
+                  "translation",
+                  "speech",
+                  "lipSync",
+                  "encode",
+                  "quality"
+                ]
+              },
+              "adapterId": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "tier": {
+                "type": "string",
+                "enum": [
+                  "production",
+                  "beta",
+                  "unavailable"
+                ]
+              },
+              "dataPolicy": {
+                "type": "string",
+                "const": "no-training"
+              }
+            },
+            "required": [
+              "capability",
+              "adapterId",
+              "version",
+              "tier",
+              "dataPolicy"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "segmentCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "translationVersionIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fileName": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "byteSize": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "fileName",
+              "sha256",
+              "byteSize"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "disclosure": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "generator",
+        "generatedAt",
+        "jobId",
+        "targetJobId",
+        "projectId",
+        "sourceLocale",
+        "targetLocale",
+        "sourceSha256",
+        "syntheticVoice",
+        "lipSyncApplied",
+        "mock",
+        "models",
+        "segmentCount",
+        "translationVersionIds",
+        "files",
+        "disclosure"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

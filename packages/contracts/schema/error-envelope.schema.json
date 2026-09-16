@@ -41,7 +41,10 @@
                 "type": "string"
               }
             },
-            "required": ["path", "message"],
+            "required": [
+              "path",
+              "message"
+            ],
             "additionalProperties": false
           },
           "default": []
@@ -51,7 +54,12 @@
           "additionalProperties": {}
         }
       },
-      "required": ["code", "message", "correlationId", "retryable"],
+      "required": [
+        "code",
+        "message",
+        "correlationId",
+        "retryable"
+      ],
       "additionalProperties": false
     }
   },

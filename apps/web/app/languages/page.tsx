@@ -1,32 +1,20 @@
-import { StatusBadge } from '@polycast/ui';
+import type { Metadata } from 'next';
+import type { LanguageCapabilitiesResponse } from '@polycast/contracts';
+import { StatusBadge, Table, toneForTier } from '@polycast/ui';
 import { apiGet } from '@/lib/api';
-
-interface LocaleRow {
-  locale: string;
-  displayName: string;
-  nativeName: string;
-  direction: 'ltr' | 'rtl';
-  priority: number;
-  tiers: Record<string, 'production' | 'beta' | 'unavailable'>;
-  note?: string;
-}
-interface Response {
-  region: string;
-  priorityScoreVersion: string;
-  locales: LocaleRow[];
-}
-
-const TONE = { production: 'ok', beta: 'warn', unavailable: 'queued' } as const;
+import { describeError } from '@/lib/errors';
 
 export const dynamic = 'force-dynamic';
 
+export const metadata: Metadata = { title: 'Languages' };
+
 export default async function LanguagesPage() {
-  let data: Response | null = null;
+  let data: LanguageCapabilitiesResponse | null = null;
   let error: string | null = null;
   try {
-    data = await apiGet<Response>('/api/v1/capabilities/languages');
+    data = await apiGet<LanguageCapabilitiesResponse>('/api/v1/capabilities/languages');
   } catch (e) {
-    error = e instanceof Error ? e.message : 'Unknown error';
+    error = describeError(e);
   }
 
   return (
@@ -49,7 +37,7 @@ export default async function LanguagesPage() {
           <p className="muted">
             Region {data.region} · priority score {data.priorityScoreVersion}
           </p>
-          <table>
+          <Table caption="Locales and capability tiers" hideCaption>
             <thead>
               <tr>
                 <th scope="col">Priority</th>
@@ -74,20 +62,20 @@ export default async function LanguagesPage() {
                     </span>
                   </td>
                   <td>
-                    <StatusBadge tone={TONE[l.tiers.speech ?? 'unavailable']}>
-                      {l.tiers.speech}
+                    <StatusBadge tone={toneForTier(l.tiers.speech)}>
+                      {l.tiers.speech ?? 'unavailable'}
                     </StatusBadge>
                   </td>
                   <td>
-                    <StatusBadge tone={TONE[l.tiers.lipSync ?? 'unavailable']}>
-                      {l.tiers.lipSync}
+                    <StatusBadge tone={toneForTier(l.tiers.lipSync)}>
+                      {l.tiers.lipSync ?? 'unavailable'}
                     </StatusBadge>
                   </td>
                   <td className="muted">{l.note ?? ''}</td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </div>
       )}
     </section>

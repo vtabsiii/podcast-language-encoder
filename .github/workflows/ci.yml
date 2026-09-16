@@ -12,6 +12,23 @@ jobs:
   node:
     name: Lint, typecheck, test, build (Node)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: polycast
+          POSTGRES_PASSWORD: polycast
+          POSTGRES_DB: polycast
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U polycast"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://polycast:polycast@127.0.0.1:5432/polycast
+      DATABASE_APP_URL: postgres://polycast_app:polycast_app@127.0.0.1:5432/polycast
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.pw-browsers
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -19,7 +36,14 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - run: pnpm install --frozen-lockfile
+      # The API integration test and the E2E suite drive the real media worker (ffmpeg is preinstalled on ubuntu-latest).
+      - name: Install media worker
+        working-directory: services/media-worker
+        run: python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
       - run: pnpm format:check
       - run: pnpm build
       - run: pnpm lint
@@ -27,6 +51,15 @@ jobs:
       - run: pnpm test
       # Synth needs no AWS credentials: stacks are environment-agnostic until deploy.
       - run: pnpm synth
+      - name: Install Playwright browser
+        run: pnpm --filter @polycast/web exec playwright install --with-deps chromium
+      - name: End-to-end (Playwright + axe)
+        run: pnpm --filter @polycast/web e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
       - name: Upload OpenAPI document
         run: pnpm --filter @polycast/api openapi
       - uses: actions/upload-artifact@v4

@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
   "pydantic>=2.10",
   "jsonschema>=4.23",
+  "boto3>=1.35",
 ]
 
 [project.optional-dependencies]
@@ -33,11 +34,17 @@ ignore = ["S603", "S607"]  # subprocess use is deliberate and argument lists are
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]
+# Field names mirror the camelCase JSON contract in packages/contracts.
+"polycast_worker/models.py" = ["N815"]
 
 [tool.mypy]
 python_version = "3.11"
 strict = true
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["boto3", "boto3.*", "botocore", "botocore.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

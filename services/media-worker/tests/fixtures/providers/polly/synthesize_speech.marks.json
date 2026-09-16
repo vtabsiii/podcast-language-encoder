@@ -1,0 +1,18 @@
+{
+  "service": "polly",
+  "operation": "synthesize_speech",
+  "expected_params": {
+    "Engine": "neural",
+    "OutputFormat": "json",
+    "SpeechMarkTypes": ["word"],
+    "TextType": "text",
+    "VoiceId": "Mia"
+  },
+  "response": {
+    "AudioStream": {
+      "__blob_base64__": "eyJ0aW1lIjogNiwgInR5cGUiOiAid29yZCIsICJzdGFydCI6IDAsICJlbmQiOiA2LCAidmFsdWUiOiAiVmlzaXRhIn0KeyJ0aW1lIjogMjMxLCAidHlwZSI6ICJ3b3JkIiwgInN0YXJ0IjogNywgImVuZCI6IDI3LCAidmFsdWUiOiAicG9seWNhc3QuZXhhbXBsZS5jb20ifQp7InRpbWUiOiA0MDIsICJ0eXBlIjogIndvcmQiLCAic3RhcnQiOiAyOCwgImVuZCI6IDMyLCAidmFsdWUiOiAicGFyYSJ9CnsidGltZSI6IDQ1NSwgInR5cGUiOiAid29yZCIsICJzdGFydCI6IDMzLCAiZW5kIjogMzQsICJ2YWx1ZSI6ICIzIn0K"
+    },
+    "ContentType": "application/x-json-stream",
+    "RequestCharacters": 52
+  }
+}

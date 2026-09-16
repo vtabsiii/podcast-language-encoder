@@ -19,11 +19,18 @@ cdk.context.json
 
 # Python
 __pycache__/
+*.egg-info/
 *.pyc
 .venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Local object storage for the filesystem driver and Playwright output
+.polycast-data/
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/e2e/.tmp/
 
 # Local environment / credentials: never commit these
 .env

@@ -91,20 +91,20 @@ stage-result writes through the API's internal endpoint; workers never hold a da
 
 ## 3. C4 component (apps/api and packages)
 
-Nodes marked "planned" do not exist on this branch; the others name real files under
-`packages/domain/src`, `packages/contracts/src`, `apps/api/src` and
-`services/media-worker/polycast_worker`.
+Every node names a real file under `packages/domain/src`, `packages/contracts/src`, `apps/api/src`
+and `services/media-worker/polycast_worker`; "M2" marks the AWS implementation of a port whose
+local implementation exists.
 
 ```mermaid
 flowchart LR
   subgraph api[apps/api]
-    routes[Routes\nhealth, capabilities today; OpenAPI at apps/api/openapi.json]
-    auth[Auth middleware - planned M1\nJWT → Membership → role via roles.ts]
-    svc[Application services - planned M1\nprojects, uploads, jobs, review, deliverables]
-    repo[Repositories - planned M1\ntenant-scoped queries]
-    sse[SSE hub - planned M1\nPostgres LISTEN/NOTIFY]
-    orch[Orchestration port - planned M1/M2\nLocalOrchestrator | StepFunctionsOrchestrator]
-    events[Event publisher - planned M1\nlocal | EventBridge]
+    routes[Routes\nauth, projects, uploads, jobs, review, deliverables, events, internal; OpenAPI at apps/api/openapi.json]
+    auth[Auth middleware - auth/principal.ts\nJWT (local HS256 | Cognito RS256) → Membership → role via roles.ts]
+    svc[Application services - services/*.ts\nprojects, uploads, jobs, review, deliverables]
+    repo[db/pool.ts withTenant\nrow-level security per transaction]
+    sse[SSE hub - events/hub.ts\nPostgres LISTEN/NOTIFY]
+    orch[Orchestration - orchestrator/local.ts\nLocalOrchestrator; StepFunctionsOrchestrator adapter (M2)]
+    events[Outbox - events/outbox.ts\ndomain_events + pg_notify; EventBridge (M2)]
   end
   subgraph domain[packages/domain]
     ents[entities.ts]
@@ -112,14 +112,14 @@ flowchart LR
     cap[capabilities/registry.ts]
     time[time/media-time.ts]
     errs[errors/domain-error.ts]
-    inv[Invalidation graph\nplanned M1]
+    inv[invalidation/graph.ts]
   end
   subgraph contracts[packages/contracts]
     zod[Zod schemas\nerrors, capabilities, events, media]
     jsonschema[export-schema.ts\n→ schema/*.schema.json]
   end
   subgraph worker[services/media-worker]
-    stages[Stage handlers\nplanned M1]
+    stages[Stage handlers\nstages/*.py]
     protos[Provider Protocols - providers/base.py\nTranscriptionProvider, TranslationProvider, SpeechProvider,\nLipSyncProvider, MediaEncodeProvider, QualityProvider]
     mocks[Mock providers\nproviders/mock.py]
     ffprobe[ffprobe.py\nparse_probe_output]
@@ -366,7 +366,7 @@ is still to be added there.
 
 | Capability | Adapter interface | Current impl | Planned provider | Milestone |
 |---|---|---|---|---|
-| Validation / probe | `ffprobe.py` (function, no Protocol) | `parse_probe_output` real; no stage | ffprobe | M1 |
+| Validation / probe | `ffprobe.py` + `stages/validating.py` | real (ffprobe, stdlib WAV fallback) | ffprobe | done (M1) |
 | Language detection | `LanguageDetector` (not yet defined) | none | Transcribe identify-language | M3 |
 | Transcription + diarization | `TranscriptionProvider` | mock | Amazon Transcribe | M3 |
 | Translation | `TranslationProvider` | mock | Amazon Translate, LLM adapter | M3 |
@@ -378,5 +378,5 @@ is still to be added there.
 | Face tracking / shots | `FaceTracker`, `ShotDetector` (not yet defined) | none | in-house on GPU Batch | M4 |
 | Lip sync | `LipSyncProvider` | mock | TBD vendor/model | M4 |
 | Encode | `MediaEncodeProvider` | mock | MediaConvert, FFmpeg | M3 |
-| QC checks | `QualityProvider` | mock (no real checks; "flags one segment" fixture is M1) | in-house | M3 |
+| QC checks | `QualityProvider` | mock fixture (flags one segment on generation 1; real loudness via ebur128 when ffmpeg exists) | in-house | M3 |
 | Notifications | `Notifier` (not yet defined) | none | SES | M3 |

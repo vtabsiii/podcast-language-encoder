@@ -1,0 +1,22 @@
+{
+  "service": "transcribe",
+  "operation": "get_transcription_job",
+  "response": {
+    "TranscriptionJob": {
+      "TranscriptionJobName": "<JOB_NAME>",
+      "TranscriptionJobStatus": "COMPLETED",
+      "LanguageCode": "en-US",
+      "IdentifiedLanguageScore": 0.9834,
+      "IdentifyLanguage": true,
+      "MediaFormat": "wav",
+      "MediaSampleRateHertz": 16000,
+      "Transcript": {
+        "TranscriptFileUri": "https://s3.us-east-1.amazonaws.com/<BUCKET>/<KEY>"
+      },
+      "Settings": {
+        "ShowSpeakerLabels": true,
+        "MaxSpeakerLabels": 10
+      }
+    }
+  }
+}

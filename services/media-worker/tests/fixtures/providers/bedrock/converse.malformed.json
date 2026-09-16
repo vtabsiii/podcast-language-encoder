@@ -1,0 +1,26 @@
+{
+  "service": "bedrock",
+  "client": "bedrock-runtime",
+  "operation": "converse",
+  "response": {
+    "output": {
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "text": "Sure! Here are the translations:\n1. Bienvenidos de nuevo al programa."
+          }
+        ]
+      }
+    },
+    "stopReason": "end_turn",
+    "usage": {
+      "inputTokens": 412,
+      "outputTokens": 96,
+      "totalTokens": 508
+    },
+    "metrics": {
+      "latencyMs": 843
+    }
+  }
+}

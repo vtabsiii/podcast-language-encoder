@@ -1,0 +1,198 @@
+{
+  "$ref": "#/definitions/output-analyzing",
+  "definitions": {
+    "output-analyzing": {
+      "type": "object",
+      "properties": {
+        "detectedLocale": {
+          "type": "string",
+          "pattern": "^[a-z]{2}-[A-Z0-9]{2,3}$"
+        },
+        "detectionConfidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "provider": {
+          "type": "string"
+        },
+        "providerVersion": {
+          "type": "string"
+        },
+        "hasVideo": {
+          "type": "boolean"
+        },
+        "proxy": {
+          "type": "string",
+          "pattern": "^(s3|local):\\/\\/[a-z0-9.-]+\\/.+$"
+        },
+        "waveform": {
+          "type": "string",
+          "pattern": "^(s3|local):\\/\\/[a-z0-9.-]+\\/.+$"
+        },
+        "speakers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "onCamera": {
+                "type": "boolean"
+              },
+              "voicePolicy": {
+                "type": "string",
+                "enum": [
+                  "matched-synthetic",
+                  "verified-replica",
+                  "stock",
+                  "keep-original"
+                ]
+              },
+              "sampleRanges": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "start": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "end": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "start",
+                    "end"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "key": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "label",
+              "onCamera",
+              "voicePolicy",
+              "sampleRanges",
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "seq": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "speakerKey": {
+                "type": "string"
+              },
+              "range": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "end": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "additionalProperties": false
+              },
+              "text": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "words": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "range": {
+                      "type": "object",
+                      "properties": {
+                        "start": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "end": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "start",
+                        "end"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "required": [
+                    "text",
+                    "range",
+                    "confidence"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "seq",
+              "speakerKey",
+              "range",
+              "text",
+              "language",
+              "confidence",
+              "words"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "detectedLocale",
+        "detectionConfidence",
+        "provider",
+        "providerVersion",
+        "hasVideo",
+        "proxy",
+        "waveform",
+        "speakers",
+        "segments"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

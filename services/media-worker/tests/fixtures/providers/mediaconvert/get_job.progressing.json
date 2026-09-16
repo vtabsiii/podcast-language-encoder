@@ -1,0 +1,16 @@
+{
+  "service": "mediaconvert",
+  "operation": "get_job",
+  "expected_params": {
+    "Id": "1726480000000-abc123"
+  },
+  "response": {
+    "Job": {
+      "Id": "1726480000000-abc123",
+      "Role": "<ROLE_ARN>",
+      "Status": "PROGRESSING",
+      "JobPercentComplete": 42,
+      "Settings": {}
+    }
+  }
+}
