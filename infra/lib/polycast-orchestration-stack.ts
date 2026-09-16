@@ -279,6 +279,29 @@ export class PolycastOrchestrationStack extends cdk.Stack {
         resources: ['*'],
       }),
     );
+    // The provider adapters (services/media-worker/polycast_worker/providers/aws). These APIs
+    // are not resource-scoped: Transcribe and Polly jobs are named per task, Translate and
+    // Bedrock take text, and Transcribe reads/writes the media buckets with this role's own
+    // S3 and KMS permissions (no data-access role is configured).
+    workerTaskRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'ProviderApis',
+        actions: [
+          'transcribe:StartTranscriptionJob',
+          'transcribe:GetTranscriptionJob',
+          'translate:TranslateText',
+          'polly:DescribeVoices',
+          'polly:SynthesizeSpeech',
+          'bedrock:InvokeModel',
+          'bedrock:InvokeModelWithResponseStream',
+          'mediaconvert:DescribeEndpoints',
+          'mediaconvert:CreateJob',
+          'mediaconvert:GetJob',
+          'ses:SendEmail',
+        ],
+        resources: ['*'],
+      }),
+    );
 
     const workerTaskDefinition = new ecs.FargateTaskDefinition(this, 'WorkerTaskDefinition', {
       cpu: 1024,
