@@ -124,6 +124,25 @@ describe('PolycastOrchestrationStack', () => {
     });
   });
 
+  test('worker role can call the provider APIs the adapters use', () => {
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Sid: 'ProviderApis',
+            Action: Match.arrayWith([
+              'transcribe:StartTranscriptionJob',
+              'transcribe:GetTranscriptionJob',
+              'translate:TranslateText',
+              'polly:SynthesizeSpeech',
+              'bedrock:InvokeModel',
+            ]),
+          }),
+        ]),
+      }),
+    });
+  });
+
   test('worker role can consume both queues and resolve task tokens', () => {
     // One action per assertion: action order differs between the CLI (minimizePolicies
     // sorts them) and this fixture (grant order), and arrayWith is order-sensitive.
