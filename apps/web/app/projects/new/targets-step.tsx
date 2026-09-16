@@ -31,8 +31,12 @@ export function TargetsStep({
   const candidates = locales.filter((l) => l.locale !== sourceLocale);
 
   function toggle(locale: string, on: boolean) {
-    if (on) onChange([...choices, { locale, lipSync: false }]);
-    else onChange(choices.filter((c) => c.locale !== locale));
+    if (on) {
+      // Lip sync is on by default wherever it is possible; the reviewer can still opt out.
+      const tier = candidates.find((l) => l.locale === locale)?.tiers.lipSync;
+      const possible = hasVideo && tier !== undefined && tier !== 'unavailable';
+      onChange([...choices, { locale, lipSync: possible }]);
+    } else onChange(choices.filter((c) => c.locale !== locale));
   }
   function setLipSync(locale: string, lipSync: boolean) {
     onChange(choices.map((c) => (c.locale === locale ? { ...c, lipSync } : c)));
