@@ -1,0 +1,5 @@
+{
+  "name": "process-transcript",
+  "private": true,
+  "description": "Bundled by aws-lambda-nodejs (esbuild) from the repository root; dependencies live in the root package.json."
+}

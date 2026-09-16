@@ -1,0 +1,26 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# TypeScript build output (sources are .ts; keep compiled output out of git)
+*.js
+!jest.config.js
+*.d.ts
+
+# CDK
+cdk.out/
+cdk.context.json
+.cdk.staging/
+
+# Local environment / credentials — never commit these
+.env
+.env.*
+*.pem
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Local Claude Code settings (shared settings.json is committed; local overrides are not)
+.claude/settings.local.json

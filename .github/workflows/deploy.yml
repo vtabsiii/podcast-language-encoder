@@ -1,0 +1,52 @@
+name: Deploy
+
+# Deploys the application stack to AWS on every push to main.
+# Authentication is via GitHub OIDC -> the role created by the
+# PodcastLanguageEncoderGithubOidc stack (see README "One-time AWS setup").
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # required to request the OIDC token
+  contents: read
+
+jobs:
+  deploy:
+    name: cdk deploy
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test -- --ci
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: cdk diff
+        run: npx cdk diff PodcastLanguageEncoder || true
+
+      - name: cdk deploy
+        run: npx cdk deploy PodcastLanguageEncoder --require-approval never --outputs-file cdk-outputs.json
+
+      - name: Show stack outputs
+        run: cat cdk-outputs.json
