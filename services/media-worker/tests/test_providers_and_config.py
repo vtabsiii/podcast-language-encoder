@@ -185,3 +185,58 @@ def test_development_config_defaults():
     assert str(cfg.local_storage_dir) == ".polycast-data/storage"
     with pytest.raises(RuntimeError, match="STORAGE_DRIVER"):
         WorkerConfig.from_env({"STORAGE_DRIVER": "gcs"})
+
+
+PRODUCTION_ENV = {
+    "POLYCAST_ENV": "production",
+    "PROVIDER_MODE": "aws",
+    "WORKER_QUEUE_URL": "q",
+    "MEDIA_BUCKET_SOURCE": "b",
+    "STORAGE_DRIVER": "s3",
+    "WORKER_TOKEN": "real-secret",
+}
+
+
+def test_lip_sync_config_defaults_to_mock_and_fails_closed_for_synclabs():
+    cfg = WorkerConfig.from_env({})
+    assert cfg.lip_sync_provider == "mock" and cfg.synclabs_api_key is None
+    assert cfg.synclabs_api_url == "https://api.sync.so"
+    assert cfg.synclabs_model == "lipsync-2" and cfg.synclabs_sync_mode == "bounce"
+    assert cfg.provider_url_ttl_s == 3600
+    # The deployed default: mock provider with an empty key variable is fine, even in production.
+    cfg = WorkerConfig.from_env({**PRODUCTION_ENV, "SYNCLABS_API_KEY": ""})
+    assert cfg.lip_sync_provider == "mock" and cfg.synclabs_api_key is None
+    # Selecting the vendor without a key refuses to start, with the variable named.
+    with pytest.raises(RuntimeError, match="LIP_SYNC_PROVIDER=synclabs requires SYNCLABS_API_KEY"):
+        WorkerConfig.from_env({**PRODUCTION_ENV, "LIP_SYNC_PROVIDER": "synclabs"})
+    with pytest.raises(RuntimeError, match="SYNCLABS_API_KEY"):
+        WorkerConfig.from_env({"LIP_SYNC_PROVIDER": "synclabs", "SYNCLABS_API_KEY": ""})
+    with pytest.raises(RuntimeError, match="LIP_SYNC_PROVIDER"):
+        WorkerConfig.from_env({"LIP_SYNC_PROVIDER": "wav2lip"})
+    with pytest.raises(RuntimeError, match="https"):
+        WorkerConfig.from_env(
+            {
+                "LIP_SYNC_PROVIDER": "synclabs",
+                "SYNCLABS_API_KEY": "k",
+                "SYNCLABS_API_URL": "http://x",
+            }
+        )
+    with pytest.raises(RuntimeError, match="PROVIDER_URL_TTL_SECONDS"):
+        WorkerConfig.from_env({"PROVIDER_URL_TTL_SECONDS": "soon"})
+    with pytest.raises(RuntimeError, match="PROVIDER_URL_TTL_SECONDS"):
+        WorkerConfig.from_env({"PROVIDER_URL_TTL_SECONDS": "0"})
+    cfg = WorkerConfig.from_env(
+        {
+            **PRODUCTION_ENV,
+            "LIP_SYNC_PROVIDER": "synclabs",
+            "SYNCLABS_API_KEY": "sk-live",
+            "SYNCLABS_API_URL": "https://api.sync.example/",
+            "SYNCLABS_MODEL": "lipsync-2-pro",
+            "SYNCLABS_SYNC_MODE": "loop",
+            "PROVIDER_URL_TTL_SECONDS": "900",
+        }
+    )
+    assert cfg.lip_sync_provider == "synclabs" and cfg.synclabs_api_key == "sk-live"
+    assert cfg.synclabs_api_url == "https://api.sync.example"
+    assert cfg.synclabs_model == "lipsync-2-pro" and cfg.synclabs_sync_mode == "loop"
+    assert cfg.provider_url_ttl_s == 900

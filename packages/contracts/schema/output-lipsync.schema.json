@@ -46,6 +46,17 @@
             ],
             "additionalProperties": false
           }
+        },
+        "video": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(s3|local):\\/\\/[a-z0-9.-]+\\/.+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

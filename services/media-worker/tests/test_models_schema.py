@@ -323,8 +323,25 @@ SAMPLES: dict[str, list[tuple[type[m.ContractModel], dict[str, Any]]]] = {
                 "providerVersion": "0",
                 "applied": False,
                 "renders": [{"segmentId": B_ID, "syncConfidence": 0.0, "video": None}],
+                "video": None,
             },
-        )
+        ),
+        (
+            m.LipSyncOutput,
+            {
+                "provider": "synclabs-lipsync",
+                "providerVersion": "lipsync-2",
+                "applied": True,
+                "renders": [
+                    {
+                        "segmentId": B_ID,
+                        "syncConfidence": 1.0,
+                        "video": "s3://derived/org/t/lip-sync/job1.mp4",
+                    }
+                ],
+                "video": "s3://derived/org/t/lip-sync/job1.mp4",
+            },
+        ),
     ],
     "output-mixing": [
         (

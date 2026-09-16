@@ -61,6 +61,13 @@ A triple is eligible for `production` only if every row passes on the current co
 Audio-only capability triples skip the lip-sync rows. Frame preservation has no beta floor: a
 lip-sync adapter that changes pixels outside the mouth region is never enabled at any tier.
 
+The first lip-sync adapter (sync.so `lipsync-2`, `synclabs-lipsync`) registers at `beta` and
+has not been benchmarked: the vendor reports no sync confidence (the adapter records 1.0 for a
+completed job, so the "sync confidence below gate" row cannot be evaluated from its output
+alone), and it returns a fully re-encoded frame, so the frame-preservation row needs the
+worker-side mouth-region compositing planned in M4 before the adapter can be considered for
+`production` on any triple.
+
 ## 4. Promotion rules beta → production
 
 1. Full benchmark run on the latest corpus version with the exact adapter version, model version
