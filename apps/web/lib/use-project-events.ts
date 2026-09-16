@@ -20,7 +20,9 @@ export interface UseProjectEventsOptions {
 /**
  * Subscribes to `GET /api/v1/events?projectId=…` through the proxy. The browser's EventSource
  * reconnects on its own (sending Last-Event-ID); while it is disconnected we poll instead so
- * the screen never goes stale (NFR: processing view within 2 s of a transition).
+ * the screen never goes stale (NFR: processing view within 2 s of a transition). `onPoll` also
+ * runs once each time the stream opens, closing the gap between the server-rendered state and
+ * the first live event.
  */
 export function useProjectEvents(projectId: string, opts: UseProjectEventsOptions = {}) {
   const { pollMs = 5000, keep = 200, enabled = true } = opts;
@@ -50,15 +52,21 @@ export function useProjectEvents(projectId: string, opts: UseProjectEventsOption
       handlers.current.onEvent?.(event);
     };
     for (const name of DOMAIN_EVENT_NAMES) source.addEventListener(name, onMessage);
-    source.addEventListener('ready', () => {
+    // Events published between the server render and the moment the stream is open are not
+    // replayed (Last-Event-ID only covers reconnects), so every (re)connect reconciles once.
+    let reconciled = false;
+    const live = () => {
       setConnection('live');
       stopPolling();
-    });
-    source.onopen = () => {
-      setConnection('live');
-      stopPolling();
+      if (!reconciled) {
+        reconciled = true;
+        handlers.current.onPoll?.();
+      }
     };
+    source.addEventListener('ready', live);
+    source.onopen = live;
     source.onerror = () => {
+      reconciled = false;
       setConnection('polling');
       startPolling();
     };
