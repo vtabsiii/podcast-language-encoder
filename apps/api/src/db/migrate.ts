@@ -22,15 +22,34 @@ export async function migrate(owner: pg.Pool, opts: MigrateOptions = {}): Promis
     );
     if (opts.createAppRole) {
       // Create the least-privilege role, or realign its password with the secret in use
-      // (Secrets Manager rotation in AWS, the dev default locally).
-      const pw = (opts.appRolePassword ?? 'polycast_app').replace(/'/g, "''");
-      await client.query(`DO $$ BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'polycast_app') THEN
-          CREATE ROLE polycast_app LOGIN PASSWORD '${pw}' NOSUPERUSER NOBYPASSRLS;
-        ELSE
-          ALTER ROLE polycast_app WITH LOGIN PASSWORD '${pw}' NOSUPERUSER NOBYPASSRLS;
-        END IF;
-      END $$;`);
+      // (Secrets Manager rotation in AWS, the dev default locally). The password travels as a
+      // bind parameter and the role statement runs inside a handler that re-raises without the
+      // statement text, so neither a server log context nor a client-side error can echo it.
+      // ALTER only touches LOGIN/PASSWORD: managed Postgres masters (RDS) are not superusers and
+      // may not restate SUPERUSER/BYPASSRLS, even to keep them unset.
+      const pw = opts.appRolePassword ?? 'polycast_app';
+      await client.query("SELECT set_config('polycast.app_role_password', $1, false)", [pw]);
+      try {
+        await client.query(`DO $$ BEGIN
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'polycast_app') THEN
+              EXECUTE format(
+                'CREATE ROLE polycast_app LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD %L',
+                current_setting('polycast.app_role_password'));
+            ELSE
+              EXECUTE format(
+                'ALTER ROLE polycast_app WITH LOGIN PASSWORD %L',
+                current_setting('polycast.app_role_password'));
+            END IF;
+          EXCEPTION WHEN OTHERS THEN
+            RAISE EXCEPTION 'could not create or realign role polycast_app: % (%)', SQLERRM, SQLSTATE;
+          END;
+        END $$;`);
+      } finally {
+        await client
+          .query("SELECT set_config('polycast.app_role_password', '', false)")
+          .catch(() => undefined);
+      }
     }
     const done = new Set(
       (await client.query<{ version: string }>('SELECT version FROM schema_migrations')).rows.map(

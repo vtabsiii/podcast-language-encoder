@@ -18,6 +18,11 @@ try {
     ...(appPassword ? { appRolePassword: appPassword } : {}),
   });
   console.log(JSON.stringify({ applied }));
+} catch (err) {
+  // Only the message: a database error object carries the failing statement (`where`), which
+  // may contain credentials, and this output lands in CloudWatch and deploy logs.
+  console.error(`migration failed: ${(err as Error).message}`);
+  process.exitCode = 1;
 } finally {
   await db.close();
 }

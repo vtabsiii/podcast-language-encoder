@@ -50,6 +50,14 @@ interface IsCompleteResponse {
 const ecs = new ECSClient({});
 const logs = new CloudWatchLogsClient({});
 
+/** Defence in depth: never forward anything that looks like a credential. */
+function redact(line: string): string {
+  return line
+    .replace(/(PASSWORD\s+)'[^']*'/gi, "$1'[redacted]'")
+    .replace(/(:\/\/[^:/@\s]+:)[^@\s]+@/g, '$1[redacted]@')
+    .replace(/((?:password|secret|token)[=:]\s*)\S+/gi, '$1[redacted]');
+}
+
 /** Last lines the migration container wrote (awslogs stream `<prefix>/<container>/<task id>`). */
 async function logTail(props: ResourceProperties, taskArn: string): Promise<string> {
   if (!props.LogGroupName || !props.LogStreamPrefix) return '';
@@ -64,7 +72,7 @@ async function logTail(props: ResourceProperties, taskArn: string): Promise<stri
       }),
     );
     const text = (out.events ?? [])
-      .map((e) => (e.message ?? '').trimEnd())
+      .map((e) => redact((e.message ?? '').trimEnd()))
       .filter(Boolean)
       .join('\n');
     return text.length > 1500 ? `…${text.slice(-1500)}` : text;

@@ -77,7 +77,10 @@ export class PolycastDataStack extends cdk.Stack {
     this.ownerSecret = this.cluster.secret;
     this.cluster.addRotationSingleUser({ automaticallyAfter: cdk.Duration.days(30) });
 
-    this.appSecret = new secretsmanager.Secret(this, 'AppSecret', {
+    // 'AppSecretV2': the first secret's value was echoed into deploy logs by a failed
+    // migration on 2026-09-16; a new construct id replaces the secret with a fresh value and
+    // the next migration realigns the role. Never reuse the old id.
+    this.appSecret = new secretsmanager.Secret(this, 'AppSecretV2', {
       description: 'Polycast: least-privilege application role for request handlers (RLS)',
       generateSecretString: {
         secretStringTemplate: JSON.stringify({ username: 'polycast_app', dbname: 'polycast' }),
