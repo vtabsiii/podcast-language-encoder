@@ -333,6 +333,8 @@ export class PolycastApiStack extends cdk.Stack {
       });
     const migrationStart = migrationFn('MigrationStartFn', 'onEvent');
     const migrationPoll = migrationFn('MigrationPollFn', 'isComplete');
+    // The failure message carries the tail of the migrate container's log.
+    logGroup.grant(migrationPoll, 'logs:GetLogEvents');
     for (const fn of [migrationStart, migrationPoll]) {
       fn.addToRolePolicy(
         new iam.PolicyStatement({
@@ -379,6 +381,8 @@ export class PolycastApiStack extends cdk.Stack {
           .subnetIds,
         SecurityGroupIds: [this.migrateSecurityGroup.securityGroupId],
         ContainerName: 'migrate',
+        LogGroupName: logGroup.logGroupName,
+        LogStreamPrefix: 'migrate',
       },
     });
     // The ingress rule to the database lives under the migrate security group (remoteRule);

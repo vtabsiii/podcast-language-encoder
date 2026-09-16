@@ -11,6 +11,7 @@
  * Runs on the Node 22 runtime, which bundles the AWS SDK v3; nothing is packaged with it.
  * Logs never contain secrets: only ARNs, statuses and exit codes are printed.
  */
+import { CloudWatchLogsClient, GetLogEventsCommand } from '@aws-sdk/client-cloudwatch-logs';
 import { DescribeTasksCommand, ECSClient, RunTaskCommand } from '@aws-sdk/client-ecs';
 
 interface ResourceProperties {
@@ -19,6 +20,9 @@ interface ResourceProperties {
   readonly SubnetIds: string[];
   readonly SecurityGroupIds: string[];
   readonly ContainerName: string;
+  /** awslogs group and stream prefix of the container, for the failure message. */
+  readonly LogGroupName?: string;
+  readonly LogStreamPrefix?: string;
   /** Opaque; changing it forces a new run (e.g. a deploy counter). */
   readonly RunKey?: string;
 }
@@ -44,6 +48,30 @@ interface IsCompleteResponse {
 }
 
 const ecs = new ECSClient({});
+const logs = new CloudWatchLogsClient({});
+
+/** Last lines the migration container wrote (awslogs stream `<prefix>/<container>/<task id>`). */
+async function logTail(props: ResourceProperties, taskArn: string): Promise<string> {
+  if (!props.LogGroupName || !props.LogStreamPrefix) return '';
+  const taskId = taskArn.split('/').pop() ?? '';
+  try {
+    const out = await logs.send(
+      new GetLogEventsCommand({
+        logGroupName: props.LogGroupName,
+        logStreamName: `${props.LogStreamPrefix}/${props.ContainerName}/${taskId}`,
+        limit: 30,
+        startFromHead: false,
+      }),
+    );
+    const text = (out.events ?? [])
+      .map((e) => (e.message ?? '').trimEnd())
+      .filter(Boolean)
+      .join('\n');
+    return text.length > 1500 ? `…${text.slice(-1500)}` : text;
+  } catch (err) {
+    return `(log tail unavailable: ${(err as Error).message})`;
+  }
+}
 
 export async function onEvent(event: OnEventRequest): Promise<OnEventResponse> {
   if (event.RequestType === 'Delete') {
@@ -93,10 +121,11 @@ export async function isComplete(event: IsCompleteRequest): Promise<IsCompleteRe
   const container = task.containers?.find((c) => c.name === props.ContainerName);
   const exitCode = container?.exitCode;
   if (exitCode !== 0) {
+    const tail = await logTail(props, taskArn);
     throw new Error(
       `migration task ${taskArn} exited with ${exitCode ?? 'no exit code'}: ${
         task.stoppedReason ?? container?.reason ?? 'see the migrate log stream'
-      }`,
+      }${tail ? `\n--- log tail ---\n${tail}` : ''}`,
     );
   }
   return { IsComplete: true, Data: { TaskArn: taskArn } };
