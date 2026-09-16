@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import type { MeResponse } from '@polycast/contracts';
 import { apiFetch } from '@/lib/api';
+import { authMode } from '@/lib/auth-config';
+import { safeNext } from '@/lib/safe-next';
 import { getSession } from '@/lib/session';
+import { CognitoLogin } from './cognito-login';
 import { LoginForm } from './login-form';
 
 export const dynamic = 'force-dynamic';
@@ -11,9 +14,10 @@ export const metadata: Metadata = { title: 'Sign in' };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; error?: string }>;
 }) {
-  const { next = '/' } = await searchParams;
+  const { next: rawNext = '/', error } = await searchParams;
+  const next = safeNext(rawNext);
   const session = await getSession();
   let me: MeResponse | null = null;
   if (session) {
@@ -23,6 +27,11 @@ export default async function LoginPage({
       me = null; // token expired or API down: fall through to a fresh sign-in
     }
   }
+
+  if (authMode() === 'cognito') {
+    return <CognitoLogin me={me} next={next} error={error} />;
+  }
+
   const memberships = me?.memberships ?? [];
   const defaults = {
     email: me?.user.email ?? session?.who?.email ?? '',

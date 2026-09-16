@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { ProjectListResponse } from '@polycast/contracts';
 import { Button, ProgressBar, Table } from '@polycast/ui';
 import { apiGet } from '@/lib/api';
+import { redirectIfUnauthenticated } from '@/lib/auth-redirect';
 import { describeError } from '@/lib/errors';
 import { formatCents, formatDateTime } from '@/lib/format';
 import { LocaleChip } from '@/components/locale-chip';
@@ -18,6 +19,7 @@ export default async function ProjectsPage() {
   try {
     data = await apiGet<ProjectListResponse>('/api/v1/projects');
   } catch (e) {
+    await redirectIfUnauthenticated(e);
     error = describeError(e);
   }
   const budget = data?.budget;
