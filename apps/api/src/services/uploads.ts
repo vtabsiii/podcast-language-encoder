@@ -233,12 +233,26 @@ export class UploadService {
             },
           );
         }
-        await this.storage.completeMultipartUpload(
-          u.bucket,
-          u.object_key,
-          u.provider_upload_id,
-          parts,
-        );
+        try {
+          await this.storage.completeMultipartUpload(
+            u.bucket,
+            u.object_key,
+            u.provider_upload_id,
+            parts,
+          );
+        } catch (err) {
+          if (err instanceof Error && /etag|part/i.test(err.message)) {
+            throw new DomainError(
+              'VALIDATION_FAILED',
+              'One or more uploaded parts do not match; re-upload them and complete again',
+              {
+                fieldErrors: [{ path: 'parts', message: err.message }],
+                cause: err,
+              },
+            );
+          }
+          throw err;
+        }
         const head = await this.storage.headObject(u.bucket, u.object_key);
         if (!head || head.byteSize !== Number(u.byte_size)) {
           throw new DomainError(

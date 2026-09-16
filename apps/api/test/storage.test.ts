@@ -48,7 +48,7 @@ describe('LocalFsStorage', () => {
       ]),
     ).rejects.toThrow(/etag/);
     await storage.completeMultipartUpload('b', 'org/k.bin', uploadId, [
-      { partNumber: 2, etag: e2 },
+      { partNumber: 2, etag: e2.replace(/"/g, '') }, // bare, as browsers send it
       { partNumber: 1, etag: e1 },
     ]);
     expect((await storage.getObject('b', 'org/k.bin')).toString()).toBe('hello world');

@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -31,13 +31,11 @@ function detached(
   env: NodeJS.ProcessEnv,
   log: string,
 ): ChildProcess {
+  // Logs stream to e2e/.tmp/*.log for the whole run so a failed test can be diagnosed.
+  const out = createWriteStream(log, { flags: 'w' });
   const child = spawn(cmd, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
-  const chunks: string[] = [];
-  child.stdout?.on('data', (d) => chunks.push(String(d)));
-  child.stderr?.on('data', (d) => chunks.push(String(d)));
-  child.on('exit', (code) => {
-    if (code && code !== 0) writeFileSync(log, chunks.join('').slice(-20_000));
-  });
+  child.stdout?.pipe(out);
+  child.stderr?.pipe(out);
   return child;
 }
 
@@ -114,7 +112,7 @@ export default async function globalSetup(): Promise<void> {
   const apiUrl = `http://127.0.0.1:${API_PORT}`;
   const env = {
     ...process.env,
-    NODE_ENV: 'test',
+    NODE_ENV: 'development',
     PORT: String(API_PORT),
     HOST: '127.0.0.1',
     PUBLIC_API_URL: apiUrl,

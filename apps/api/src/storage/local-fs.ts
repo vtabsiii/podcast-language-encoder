@@ -4,6 +4,11 @@ import { mkdir, readFile, readdir, rename, rm, stat, unlink, writeFile } from 'n
 import { dirname, join, resolve, sep } from 'node:path';
 import type { ObjectInfo, SignedUrl, StorageDriver, UploadedPart } from './driver.js';
 
+/** Strip quotes and a weak-validator prefix so `"abc"`, `W/"abc"` and `abc` compare equal. */
+export function normalizeEtag(etag: string): string {
+  return etag.trim().replace(/^W\//i, '').replace(/^"|"$/g, '').toLowerCase();
+}
+
 export interface LocalFsOptions {
   rootDir: string;
   /** Base URL of this API, used to build signed URLs. */
@@ -156,8 +161,9 @@ export class LocalFsStorage implements StorageDriver {
     const chunks: Buffer[] = [];
     for (const p of [...parts].sort((a, b) => a.partNumber - b.partNumber)) {
       const buf = await readFile(join(dir, String(p.partNumber)));
-      const etag = `"${createHash('md5').update(buf).digest('hex')}"`;
-      if (etag !== p.etag) throw new Error(`etag mismatch for part ${p.partNumber}`);
+      const etag = createHash('md5').update(buf).digest('hex');
+      // Clients may send the ETag quoted (as returned) or bare; S3 accepts both.
+      if (etag !== normalizeEtag(p.etag)) throw new Error(`etag mismatch for part ${p.partNumber}`);
       chunks.push(buf);
     }
     await writeFile(tmp, Buffer.concat(chunks));
