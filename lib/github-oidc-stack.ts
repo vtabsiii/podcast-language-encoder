@@ -27,12 +27,26 @@ export class GithubOidcStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: GithubOidcStackProps) {
     super(scope, id, props);
 
-    const repoPath = `${props.githubOwner}/${props.githubRepo}`;
-    const subjects = props.allowedSubjects ?? [
-      `repo:${repoPath}:ref:refs/heads/main`,
-      `repo:${repoPath}:pull_request`,
-      `repo:${repoPath}:environment:production`,
-    ];
+  const repoPath = `${props.githubOwner}/${props.githubRepo}`;
+
+  // Newer GitHub OIDC tokens spell the subject as `repo:owner@<id>/repo@<id>:...`
+  // rather than `repo:owner/repo:...`. The numeric IDs are immutable, so trust
+  // both spellings exactly (no wildcards). IDs come from cdk.json context
+  // (`githubOwnerId`, `githubRepoId`); look them up with
+  // `gh api users/<owner>` and `gh api repos/<owner>/<repo>`.
+  const ownerId = this.node.tryGetContext('githubOwnerId') as string | number | undefined;
+  const repoId = this.node.tryGetContext('githubRepoId') as string | number | undefined;
+  const repoPaths = [repoPath];
+  if (ownerId && repoId) {
+    repoPaths.push(`${props.githubOwner}@${ownerId}/${props.githubRepo}@${repoId}`);
+  }
+  const subjects =
+    props.allowedSubjects ??
+    repoPaths.flatMap((p) => [
+      `repo:${p}:ref:refs/heads/main`,
+      `repo:${p}:pull_request`,
+      `repo:${p}:environment:production`,
+    ]);
 
     // An account can only hold one provider for token.actions.githubusercontent.com.
     // If one already exists, pass its ARN via context `githubOidcProviderArn`.
