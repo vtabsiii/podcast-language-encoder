@@ -33,6 +33,11 @@ on:
         required: false
         default: ''
         type: string
+      adminEmail:
+        description: 'Email of the first Cognito user (optional; receives an invitation with a temporary password)'
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: deploy-polycast
@@ -51,6 +56,7 @@ jobs:
     env:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
       SES_FROM_ADDRESS: ${{ inputs.sesFromAddress }}
+      ADMIN_EMAIL: ${{ inputs.adminEmail }}
     steps:
       - name: Check confirmation
         if: ${{ inputs.confirm != 'deploy-polycast' }}
@@ -112,6 +118,7 @@ jobs:
           npx cdk diff 'Polycast*'
           ${WEB_ORIGIN:+-c polycastWebOrigins="$WEB_ORIGIN"}
           ${SES_FROM_ADDRESS:+-c polycastSesFromAddress="$SES_FROM_ADDRESS"}
+          ${ADMIN_EMAIL:+-c polycastAdminEmail="$ADMIN_EMAIL"}
           || true
 
       - name: cdk deploy
@@ -124,6 +131,7 @@ jobs:
           --concurrency 3
           ${WEB_ORIGIN:+-c polycastWebOrigins="$WEB_ORIGIN"}
           ${SES_FROM_ADDRESS:+-c polycastSesFromAddress="$SES_FROM_ADDRESS"}
+          ${ADMIN_EMAIL:+-c polycastAdminEmail="$ADMIN_EMAIL"}
           --outputs-file cdk-outputs.json
 
       - name: cdk deploy (second pass with the CloudFront origin)
@@ -137,6 +145,7 @@ jobs:
           npx cdk deploy 'Polycast*' --require-approval never --concurrency 3 \
             -c polycastWebOrigins="https://${domain}" \
             ${SES_FROM_ADDRESS:+-c polycastSesFromAddress="$SES_FROM_ADDRESS"} \
+            ${ADMIN_EMAIL:+-c polycastAdminEmail="$ADMIN_EMAIL"} \
             --outputs-file cdk-outputs.json
 
       - name: Show stack outputs

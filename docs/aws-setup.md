@@ -144,6 +144,7 @@ Pass with `-c key=value` (or `cdk.json` context); all are optional.
 | --- | --- | --- |
 | `polycastWebOrigins` | `http://localhost:3000` | comma-separated browser origins: quarantine CORS, API `CORS_ORIGINS`, Cognito callback/sign-out URLs, the web tier's `WEB_ORIGIN`. The workflow resolves it from the deployed `PolycastWeb` stack (`https://<distribution>.cloudfront.net`) |
 | `polycastSesFromAddress` | unset | verified SES sender for worker email notifications; in-app notifications only when unset |
+| `polycastAdminEmail` | unset | email of the first Cognito user; created once with an invitation email (temporary password), existing users are left alone. Workflow input `adminEmail` |
 | `polycastCognitoDomainPrefix` | `polycast-<account id>` | hosted UI domain prefix (globally unique per region) |
 | `polycastMonthlyBudgetUsd` | `200` | monthly cost budget |
 | `polycastCloudFrontPublicKeyPem` | unset | RSA public key; enables the signed `/media/*` behaviour |
@@ -175,7 +176,9 @@ equivalent is `cd infra && npx cdk deploy 'Polycast*' -c polycastWebOrigins=http
 
 ### Users and organizations
 
-Users are created by an administrator (self sign-up is off). The API provisions the matching
+Users are created by an administrator (self sign-up is off). The first one can be created by
+the deploy itself: run the workflow with `adminEmail` set (context `polycastAdminEmail`) and the
+`PolycastAuth` stack calls `AdminCreateUser`, which emails a temporary password. The API provisions the matching
 `users` row just in time: the first request that carries a valid ID token for an unseen `sub`
 creates it from the token's `email` and `name` claims. Membership lives in the database, not in
 Cognito. A user who signs in with no membership yet is shown the "create your organization"
