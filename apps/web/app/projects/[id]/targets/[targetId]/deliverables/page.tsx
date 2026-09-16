@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { DeliverablesResponse } from '@polycast/contracts';
@@ -7,6 +8,8 @@ import { JobStateBadge } from '@/components/state-badge';
 import { DeliverablesTable } from './deliverables-table';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = { title: 'Deliverables' };
 
 export default async function DeliverablesPage({
   params,

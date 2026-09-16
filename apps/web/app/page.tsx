@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ProjectListResponse } from '@polycast/contracts';
 import { Button, ProgressBar, Table } from '@polycast/ui';
@@ -8,6 +9,8 @@ import { LocaleChip } from '@/components/locale-chip';
 import { ProjectStateBadge } from '@/components/state-badge';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = { title: 'Projects' };
 
 export default async function ProjectsPage() {
   let data: ProjectListResponse | null = null;

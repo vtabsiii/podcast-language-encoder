@@ -1,9 +1,12 @@
+import type { Metadata } from 'next';
 import type { LanguageCapabilitiesResponse } from '@polycast/contracts';
 import { StatusBadge, Table, toneForTier } from '@polycast/ui';
 import { apiGet } from '@/lib/api';
 import { describeError } from '@/lib/errors';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = { title: 'Languages' };
 
 export default async function LanguagesPage() {
   let data: LanguageCapabilitiesResponse | null = null;

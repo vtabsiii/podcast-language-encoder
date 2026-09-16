@@ -142,9 +142,10 @@ export function NewLocalizationWizard({
           projectId={projectId}
           existingAsset={detail?.asset ?? null}
           onProjectCreated={(id) => go(1, id)}
-          onUploaded={async () => {
-            await refreshDetail();
-            go(2);
+          onUploaded={async (id) => {
+            // The project may have been created in this same click, so take the id from the
+            // upload step rather than the (possibly stale) search param.
+            go(2, id);
           }}
         />
       )}

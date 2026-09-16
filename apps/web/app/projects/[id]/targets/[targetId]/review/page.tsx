@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import type { ReviewResponse } from '@polycast/contracts';
 import type { CommentsResponse } from '@/lib/contract-types';
@@ -6,6 +7,8 @@ import { ApiError, describeError } from '@/lib/errors';
 import { ReviewStudio } from './review-studio';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = { title: 'Review' };
 
 export default async function ReviewPage({
   params,

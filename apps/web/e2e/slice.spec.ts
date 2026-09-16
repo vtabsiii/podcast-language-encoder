@@ -23,6 +23,7 @@ test.afterAll(async () => {
 });
 
 async function expectAccessible(page: Page, screen: string) {
+  await expect(page).toHaveTitle(/\S/);
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
     .analyze();
@@ -75,7 +76,7 @@ test('wizard: upload, analysis, targets, estimate, submit', async () => {
   await page.getByRole('button', { name: 'Continue' }).click();
 
   await expect(page.getByRole('heading', { name: /Step 4/ })).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'es-MX' })).toBeVisible();
+  await expect(page.getByRole('rowheader', { name: 'es-MX' })).toBeVisible();
   await page.check('#accept-beta');
   await expectAccessible(page, 'wizard step 4');
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -100,9 +101,7 @@ test('processing view shows live stages and reaches NEEDS_REVIEW', async () => {
   reviewUrl = page.url();
 });
 
-test('review studio: flagged segment, keyboard navigation, regenerate, approve', async ({
-  page,
-}) => {
+test('review studio: flagged segment, keyboard navigation, regenerate, approve', async () => {
   await page.goto(reviewUrl);
   await expect(page.getByRole('heading', { name: /Review es-MX/ })).toBeVisible();
   await expect(page.getByText('1 open issue')).toBeVisible();
@@ -117,12 +116,13 @@ test('review studio: flagged segment, keyboard navigation, regenerate, approve',
   await expect(list.locator('li').first()).toHaveAttribute('aria-current', 'true');
 
   await expect(page.getByRole('button', { name: 'Approve target' })).toBeDisabled();
-  await page.getByRole('button', { name: 'Regenerate translation' }).click();
+  await page.getByRole('button', { name: 'Regenerate translation' }).first().click();
   await expect(page.getByRole('status').filter({ hasText: /Regeneration queued/ })).toBeVisible();
   await expect(page.getByText('0 open issues')).toBeVisible({ timeout: 180_000 });
-  await expect(page.getByText(/v2 · mock-translation/)).toBeVisible({ timeout: 30_000 });
+  // The target re-runs translate → … → QA on the whole episode before it returns to review.
+  await expect(page.getByText(/v2 · mock-translation/)).toBeVisible({ timeout: 240_000 });
   await expect(page.getByRole('button', { name: 'Approve target' })).toBeEnabled({
-    timeout: 30_000,
+    timeout: 60_000,
   });
   await page.getByRole('button', { name: 'Approve target' }).click();
   await expect(page.getByRole('status').filter({ hasText: /Target approved/ })).toBeVisible();
@@ -142,9 +142,7 @@ test('deliverables are packaged with checksums and a provenance disclosure', asy
   await expectAccessible(page, 'deliverables');
 });
 
-test('dashboard reflects the completed target and the languages page is RTL-aware', async ({
-  page,
-}) => {
+test('dashboard reflects the completed target and the languages page is RTL-aware', async () => {
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'E2E Episode' })).toBeVisible();
   await expect(page.getByText(/COMPLETE|Complete/).first()).toBeVisible({ timeout: 60_000 });

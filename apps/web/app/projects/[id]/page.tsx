@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import type { ProjectDetailResponse } from '@polycast/contracts';
 import type { JobListResponse } from '@/lib/contract-types';
@@ -6,6 +7,8 @@ import { ApiError, describeError } from '@/lib/errors';
 import { ProcessingView } from './processing-view';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = { title: 'Processing' };
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

@@ -42,7 +42,7 @@ export interface UploadStepProps {
   projectId: string | null;
   existingAsset: AssetSummary | null;
   onProjectCreated: (projectId: string) => void;
-  onUploaded: () => Promise<void> | void;
+  onUploaded: (projectId: string) => Promise<void> | void;
 }
 
 export function UploadStep({
@@ -104,7 +104,7 @@ export function UploadStep({
       uploader.current = up;
       await up.run();
       setPending(null);
-      await onUploaded();
+      await onUploaded(id);
     } catch (err) {
       if (err instanceof Error && err.name === 'UploadAbortedError') return;
       setError(describeError(err));

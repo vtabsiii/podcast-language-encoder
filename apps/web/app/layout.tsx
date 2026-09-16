@@ -6,7 +6,7 @@ import './globals.css';
 import { getSession } from '@/lib/session';
 
 export const metadata: Metadata = {
-  title: 'Polycast Studio',
+  title: { default: 'Polycast Studio', template: '%s · Polycast Studio' },
   description: 'Localize a podcast once: voices, timing, captions, and visible speech aligned.',
 };
 

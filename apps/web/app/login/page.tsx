@@ -1,9 +1,12 @@
+import type { Metadata } from 'next';
 import type { MeResponse } from '@polycast/contracts';
 import { apiFetch } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { LoginForm } from './login-form';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = { title: 'Sign in' };
 
 export default async function LoginPage({
   searchParams,
