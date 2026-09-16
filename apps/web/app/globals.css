@@ -283,6 +283,20 @@ dl.stat-list dd {
   .studio {
     grid-template-columns: 1fr;
   }
+  /* Single column: put the editor (every action lives there) before the tall list, and keep
+     the list short enough that the reviewer can see there is something below it. */
+  .studio > .studio-detail {
+    order: -1;
+  }
+  .segment-list {
+    max-height: 40vh;
+  }
+}
+.issue-nav {
+  display: flex;
+  gap: var(--pc-space-3);
+  flex-wrap: wrap;
+  align-items: center;
 }
 .segment-list {
   list-style: none;
@@ -296,7 +310,7 @@ dl.stat-list dd {
 .segment-list li {
   border-bottom: 1px solid var(--pc-color-border);
 }
-.segment-list button {
+.segment-list > li > button {
   display: block;
   width: 100%;
   text-align: start;
@@ -307,9 +321,17 @@ dl.stat-list dd {
   color: inherit;
   cursor: pointer;
 }
-.segment-list li[aria-current='true'] button {
+.segment-list li[aria-current='true'] > button,
+.segment-actions {
   background: var(--pc-color-surface-raised);
   box-shadow: inset 3px 0 0 var(--pc-color-accent);
+}
+.segment-actions {
+  display: flex;
+  gap: var(--pc-space-2) var(--pc-space-3);
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 0 var(--pc-space-3) var(--pc-space-3);
 }
 .segment-meta {
   display: flex;
