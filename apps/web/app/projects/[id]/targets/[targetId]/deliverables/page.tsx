@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { DeliverablesResponse } from '@polycast/contracts';
 import { apiGet } from '@/lib/api';
+import { redirectIfUnauthenticated } from '@/lib/auth-redirect';
 import { ApiError, describeError } from '@/lib/errors';
 import { JobStateBadge } from '@/components/state-badge';
 import { DeliverablesTable } from './deliverables-table';
@@ -21,6 +22,7 @@ export default async function DeliverablesPage({
   try {
     data = await apiGet<DeliverablesResponse>(`/api/v1/target-jobs/${targetId}/deliverables`);
   } catch (e) {
+    await redirectIfUnauthenticated(e);
     if (e instanceof ApiError && e.status === 404) notFound();
     return (
       <section aria-labelledby="deliverables-error-heading">

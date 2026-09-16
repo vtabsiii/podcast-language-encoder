@@ -76,7 +76,28 @@ only) stores it in an httpOnly cookie, and `app/api/[...path]/route.ts` proxies 
 to `API_BASE_URL` (default `http://127.0.0.1:4000`) with the bearer header, streaming SSE
 through. Only upload part bytes go straight from the browser to signed storage URLs.
 `pnpm --filter @polycast/web test` runs the vitest suite (upload client, time formatting,
-SSE parsing, stage timeline).
+SSE parsing, stage timeline, PKCE and redirect-target sanitising).
+
+Sign-in is selected by `AUTH_MODE` (read server-side at request time, never `NEXT_PUBLIC_`):
+
+- `local` (default): the dev form above, posting to `POST /api/v1/auth/dev-login`.
+- `cognito`: the Cognito hosted UI via OAuth 2.0 authorization code + PKCE (public client, no
+  secret). `GET /login` links to `GET /auth/start`, which parks the PKCE verifier, `state` and
+  the sanitised `next` path in a 10-minute cookie scoped to `/auth` and redirects to
+  `/oauth2/authorize`. `GET /auth/callback` checks `state`, exchanges the code, stores the ID
+  token in `pc_session` (the API verifies ID tokens), the refresh token in `pc_refresh` (30
+  days, path `/auth`), and fills `pc_org`/`pc_who` from `GET /api/v1/me`. A principal with no
+  membership yet (403 `FORBIDDEN`) lands on `/login/organization`, which creates one through
+  `POST /api/v1/organizations`. Expired sessions go through `GET /auth/refresh?next=…`
+  (silent renewal with a loop guard) before falling back to `/login`; `GET /logout` also ends
+  the hosted-UI session and returns with `?done=1`. With a live session, `/login` is the
+  organization switcher the topbar links to.
+
+  Required env vars in cognito mode: `AUTH_MODE=cognito`, `COGNITO_CLIENT_ID`,
+  `COGNITO_HOSTED_UI_URL` (no trailing slash) and `WEB_ORIGIN` (public origin; the app client
+  must list `${WEB_ORIGIN}/auth/callback` as a callback URL and `${WEB_ORIGIN}/logout?done=1`
+  as a sign-out URL). `WEB_ORIGIN` falls back to the request origin when unset, plus
+  `API_BASE_URL` as always. Nothing in the flow logs tokens or codes.
 
 ## Verify
 
