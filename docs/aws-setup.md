@@ -145,6 +145,7 @@ Pass with `-c key=value` (or `cdk.json` context); all are optional.
 | `polycastWebOrigins` | `http://localhost:3000` | comma-separated browser origins: quarantine CORS, API `CORS_ORIGINS`, Cognito callback/sign-out URLs, the web tier's `WEB_ORIGIN`. The workflow resolves it from the deployed `PolycastWeb` stack (`https://<distribution>.cloudfront.net`) |
 | `polycastSesFromAddress` | unset | verified SES sender for worker email notifications; in-app notifications only when unset |
 | `polycastAdminEmail` | unset | email of the first Cognito user; created once with an invitation email (temporary password), existing users are left alone. Workflow input `adminEmail` |
+| `polycastLipSyncProvider` | `mock` | lip-sync vendor for the media worker: `mock` (lip sync reported as not applied) or `synclabs` (sync.so). Workflow input `lipSyncProvider` |
 | `polycastAdminResend` | unset | any new value re-sends the invitation (fresh temporary password) to `polycastAdminEmail` while that user has not signed in. Workflow input `resendInvitation` |
 | `polycastCognitoDomainPrefix` | `polycast-<account id>` | hosted UI domain prefix (globally unique per region) |
 | `polycastMonthlyBudgetUsd` | `200` | monthly cost budget |
@@ -174,6 +175,23 @@ lookup roles), so no policy widening is needed. One run does everything:
 
 The job summary lists the web URL, user pool id and hosted UI URL. From a laptop the
 equivalent is `cd infra && npx cdk deploy 'Polycast*' -c polycastWebOrigins=https://<domain>`.
+
+### Lip sync (sync.so)
+
+The worker's lip-sync adapter calls sync.so (`services/media-worker/polycast_worker/providers/synclabs.py`).
+`PolycastOrchestration` creates the secret `polycast/synclabs` with an empty `apiKey` field and
+injects it as `SYNCLABS_API_KEY`; the worker refuses to start with `LIP_SYNC_PROVIDER=synclabs`
+and an empty key. To enable it:
+
+1. Create an API key at https://sync.so and store it: Secrets Manager → `polycast/synclabs` →
+   Retrieve/Edit secret value → set `apiKey` (or
+   `aws secretsmanager put-secret-value --secret-id polycast/synclabs --secret-string '{"apiKey":"<key>"}'`).
+2. Run the `Deploy Polycast (manual)` workflow with `lipSyncProvider = synclabs`. The new task
+   definition picks the key up; targets submitted with lip sync on a video asset then get a
+   synced render, and the deliverable is encoded from it.
+
+Set `lipSyncProvider = mock` (or leave it empty) to go back to reporting lip sync as not
+applied. The vendor tier stays `beta` until `docs/quality-benchmark.md` promotes it.
 
 ### Users and organizations
 

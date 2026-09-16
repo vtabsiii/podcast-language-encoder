@@ -53,6 +53,7 @@ cdk.Tags.of(encoder).add('project', 'podcast-language-encoder');
 //   polycastSesFromAddress         verified SES sender for worker email notifications
 //   polycastAdminEmail             first Cognito user (invitation email with a temporary password)
 //   polycastAdminResend            any new value re-sends that invitation (fresh temporary password)
+//   polycastLipSyncProvider        mock (default) or synclabs (key in the polycast/synclabs secret)
 //   polycastCognitoDomainPrefix    hosted UI prefix (default polycast-<account id>)
 //   polycastMonthlyBudgetUsd       AWS Budgets limit (default 200)
 //   polycastCloudFrontPublicKeyPem RSA public key enabling the signed /media/* behaviour
@@ -67,6 +68,13 @@ const polycastWebOrigins = (contextString('polycastWebOrigins') ?? 'http://local
 const polycastSesFromAddress = contextString('polycastSesFromAddress');
 const polycastAdminEmail = contextString('polycastAdminEmail');
 const polycastAdminResend = contextString('polycastAdminResend');
+const polycastLipSyncProviderRaw = contextString('polycastLipSyncProvider') ?? 'mock';
+if (polycastLipSyncProviderRaw !== 'mock' && polycastLipSyncProviderRaw !== 'synclabs') {
+  throw new Error(
+    `polycastLipSyncProvider must be mock or synclabs, got ${polycastLipSyncProviderRaw}`,
+  );
+}
+const polycastLipSyncProvider = polycastLipSyncProviderRaw;
 const polycastCognitoDomainPrefix =
   contextString('polycastCognitoDomainPrefix') ?? `polycast-${cdk.Aws.ACCOUNT_ID}`;
 const polycastMonthlyBudgetUsd = Number(contextString('polycastMonthlyBudgetUsd') ?? 200);
@@ -124,6 +132,7 @@ new PolycastOrchestrationStack(app, 'PolycastOrchestration', {
   apiLoadBalancerSecurityGroup: api.loadBalancerSecurityGroup,
   workerTokenSecret: api.workerTokenSecret,
   sesFromAddress: polycastSesFromAddress,
+  lipSyncProvider: polycastLipSyncProvider,
   monthlyBudgetUsd: polycastMonthlyBudgetUsd,
   description: 'Polycast Studio: Step Functions, EventBridge, SQS, media worker, budget',
 });

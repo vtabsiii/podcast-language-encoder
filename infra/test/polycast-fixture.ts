@@ -12,6 +12,7 @@ export interface PolycastFixtureOptions {
   cloudFrontPublicKeyPem?: string;
   monthlyBudgetUsd?: number;
   sesFromAddress?: string;
+  lipSyncProvider?: 'mock' | 'synclabs';
   bootstrapAdminEmail?: string;
   bootstrapAdminResendKey?: string;
 }
@@ -62,6 +63,7 @@ export function buildPolycastApp(options: PolycastFixtureOptions = {}) {
     apiLoadBalancerSecurityGroup: api.loadBalancerSecurityGroup,
     workerTokenSecret: api.workerTokenSecret,
     sesFromAddress: options.sesFromAddress,
+    lipSyncProvider: options.lipSyncProvider,
     monthlyBudgetUsd: options.monthlyBudgetUsd,
   });
   const web = new PolycastWebStack(app, 'PolycastWeb', {

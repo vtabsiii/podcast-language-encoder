@@ -43,6 +43,12 @@ export interface PolycastOrchestrationStackProps extends cdk.StackProps {
    * records notifications in-app only (services/media-worker config).
    */
   sesFromAddress?: string;
+  /**
+   * Lip-sync vendor for the worker (`LIP_SYNC_PROVIDER`): `mock` (default, lip sync reported
+   * as not applied) or `synclabs` (sync.so; the API key must be stored in the
+   * `polycast/synclabs` secret first, see docs/aws-setup.md).
+   */
+  lipSyncProvider?: 'mock' | 'synclabs';
   /** Monthly cost budget in USD; notifications at 80% and 100%. Defaults to 200. */
   monthlyBudgetUsd?: number;
 }
@@ -80,6 +86,7 @@ export class PolycastOrchestrationStack extends cdk.Stack {
   public readonly childStateMachine: sfn.StateMachine;
   public readonly parentStateMachine: sfn.StateMachine;
   public readonly workerService: ecs.FargateService;
+  public readonly syncLabsSecret: secretsmanager.Secret;
   public readonly alertsTopic: sns.Topic;
 
   constructor(scope: Construct, id: string, props: PolycastOrchestrationStackProps) {
@@ -303,6 +310,16 @@ export class PolycastOrchestrationStack extends cdk.Stack {
       }),
     );
 
+    // Third-party lip-sync credentials. Created with an empty key so the deploy never carries
+    // a real value; the owner pastes the vendor key into this secret (field `apiKey`) in the
+    // console or CLI, then redeploys with lipSyncProvider=synclabs. The worker refuses to start
+    // with `synclabs` selected and an empty key (config.py fails closed).
+    this.syncLabsSecret = new secretsmanager.Secret(this, 'SyncLabsApiKey', {
+      secretName: 'polycast/synclabs',
+      description: 'Polycast: sync.so API key for the lip-sync provider (field apiKey)',
+      secretObjectValue: { apiKey: cdk.SecretValue.unsafePlainText('') },
+    });
+
     const workerTaskDefinition = new ecs.FargateTaskDefinition(this, 'WorkerTaskDefinition', {
       cpu: 1024,
       memoryLimitMiB: 2048,
@@ -327,8 +344,12 @@ export class PolycastOrchestrationStack extends cdk.Stack {
         MEDIA_BUCKET_DERIVED: props.buckets.derived.bucketName,
         MEDIA_BUCKET_DELIVERABLES: props.buckets.deliverables.bucketName,
         ...(props.sesFromAddress ? { SES_FROM_ADDRESS: props.sesFromAddress } : {}),
+        LIP_SYNC_PROVIDER: props.lipSyncProvider ?? 'mock',
       },
-      secrets: { WORKER_TOKEN: ecs.Secret.fromSecretsManager(props.workerTokenSecret) },
+      secrets: {
+        WORKER_TOKEN: ecs.Secret.fromSecretsManager(props.workerTokenSecret),
+        SYNCLABS_API_KEY: ecs.Secret.fromSecretsManager(this.syncLabsSecret, 'apiKey'),
+      },
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'media-worker',
         logGroup: new logs.LogGroup(this, 'WorkerLogs', {
@@ -447,6 +468,11 @@ export class PolycastOrchestrationStack extends cdk.Stack {
     });
 
     // -------------------------------------------------------------- outputs
+    new cdk.CfnOutput(this, 'SyncLabsSecretArn', {
+      value: this.syncLabsSecret.secretArn,
+      description:
+        'Put the sync.so API key in field apiKey, then deploy with lipSyncProvider=synclabs',
+    });
     new cdk.CfnOutput(this, 'EventBusName', { value: this.eventBus.eventBusName });
     new cdk.CfnOutput(this, 'StageQueueUrl', { value: this.stageQueue.queueUrl });
     new cdk.CfnOutput(this, 'ReviewWaitQueueUrl', { value: this.reviewWaitQueue.queueUrl });
