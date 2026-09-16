@@ -55,11 +55,23 @@ jobs:
         run: pnpm --filter @polycast/web exec playwright install --with-deps chromium
       - name: End-to-end (Playwright + axe)
         run: pnpm --filter @polycast/web e2e
+      - name: Show API and worker logs (on failure)
+        if: failure()
+        run: |
+          for f in apps/web/e2e/.tmp/api.log apps/web/e2e/.tmp/worker.log; do
+            echo "::group::$f (last 200 lines)"; tail -n 200 "$f" 2>/dev/null || echo "(missing)"; echo "::endgroup::"
+          done
+          for f in apps/web/test-results/*/error-context.md; do
+            [ -f "$f" ] || continue
+            echo "::group::$f"; cat "$f"; echo "::endgroup::"
+          done
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: playwright-report
-          path: apps/web/playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/web/e2e/.tmp/*.log
       - name: Upload OpenAPI document
         run: pnpm --filter @polycast/api openapi
       - uses: actions/upload-artifact@v4
