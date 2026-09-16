@@ -21,7 +21,8 @@ export interface CognitoVerifierOptions {
   now?: () => number;
 }
 
-const b64url = (s: string): Buffer => Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+const b64url = (s: string): Buffer =>
+  Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
 
 export class CognitoVerifier {
   private keys = new Map<string, ReturnType<typeof createPublicKey>>();
@@ -61,17 +62,21 @@ export class CognitoVerifier {
     } catch {
       throw new DomainError('UNAUTHENTICATED', 'Malformed token');
     }
-    if (header.alg !== 'RS256' || !header.kid) throw new DomainError('UNAUTHENTICATED', 'Unsupported token algorithm');
+    if (header.alg !== 'RS256' || !header.kid)
+      throw new DomainError('UNAUTHENTICATED', 'Unsupported token algorithm');
     const key = await this.key(header.kid);
     const ok = verifySignature('RSA-SHA256', Buffer.from(`${h}.${b}`), key, b64url(s));
     if (!ok) throw new DomainError('UNAUTHENTICATED', 'Invalid token signature');
 
     const now = Math.floor((this.opts.now?.() ?? Date.now()) / 1000);
-    if (typeof payload['exp'] !== 'number' || payload['exp'] <= now) throw new DomainError('UNAUTHENTICATED', 'Token expired');
-    if (payload['iss'] !== this.issuer) throw new DomainError('UNAUTHENTICATED', 'Token issuer mismatch');
+    if (typeof payload['exp'] !== 'number' || payload['exp'] <= now)
+      throw new DomainError('UNAUTHENTICATED', 'Token expired');
+    if (payload['iss'] !== this.issuer)
+      throw new DomainError('UNAUTHENTICATED', 'Token issuer mismatch');
     if (this.opts.clientId) {
       const audience = payload['aud'] ?? payload['client_id'];
-      if (audience !== this.opts.clientId) throw new DomainError('UNAUTHENTICATED', 'Token audience mismatch');
+      if (audience !== this.opts.clientId)
+        throw new DomainError('UNAUTHENTICATED', 'Token audience mismatch');
     }
     const sub = payload['sub'];
     if (typeof sub !== 'string') throw new DomainError('UNAUTHENTICATED', 'Token missing subject');
@@ -91,7 +96,12 @@ export class CognitoVerifier {
       email: typeof payload['email'] === 'string' ? payload['email'] : '',
       name: typeof payload['name'] === 'string' ? payload['name'] : '',
       org_ids: orgIds,
-      role: typeof payload['role'] === 'string' ? payload['role'] : typeof payload['custom:role'] === 'string' ? payload['custom:role'] : 'viewer',
+      role:
+        typeof payload['role'] === 'string'
+          ? payload['role']
+          : typeof payload['custom:role'] === 'string'
+            ? payload['custom:role']
+            : 'viewer',
       iat: typeof payload['iat'] === 'number' ? payload['iat'] : now,
       exp: payload['exp'],
     };
@@ -100,6 +110,9 @@ export class CognitoVerifier {
 
 async function defaultFetchJwks(url: string): Promise<Jwks> {
   const res = await fetch(url);
-  if (!res.ok) throw new DomainError('PROVIDER_UNAVAILABLE', 'Could not fetch the identity provider keys', { retryable: true });
+  if (!res.ok)
+    throw new DomainError('PROVIDER_UNAVAILABLE', 'Could not fetch the identity provider keys', {
+      retryable: true,
+    });
   return (await res.json()) as Jwks;
 }

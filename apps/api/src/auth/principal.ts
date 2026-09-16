@@ -63,7 +63,9 @@ export const authPlugin = fp<AuthPluginOptions>(async (app, opts) => {
   app.addHook('onRequest', async (req) => {
     const header = req.headers.authorization;
     if (!header?.startsWith('Bearer ')) return;
-    const claims = cognito ? await cognito.verify(header.slice(7)) : verifyToken(header.slice(7), opts.config.LOCAL_JWT_SECRET);
+    const claims = cognito
+      ? await cognito.verify(header.slice(7))
+      : verifyToken(header.slice(7), opts.config.LOCAL_JWT_SECRET);
     const requested = req.headers['x-organization-id'];
     const orgHeader = typeof requested === 'string' && requested.length > 0 ? requested : null;
 

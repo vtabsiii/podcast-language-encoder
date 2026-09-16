@@ -1,0 +1,19 @@
+# Build context for apps/api/Dockerfile, apps/web/Dockerfile and
+# services/media-worker/Dockerfile is the repository root.
+**/node_modules
+.git
+**/.next
+**/dist
+**/cdk.out
+**/.turbo
+**/.venv
+**/__pycache__
+**/*.egg-info
+.polycast-data
+**/test-results
+**/playwright-report
+*.log
+.env
+.env.*
+!.env.example
+*.pem

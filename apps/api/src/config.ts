@@ -81,10 +81,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const cfg: AppConfig = {
     ...parsed,
     // ECS injects secret fields one by one; compose the URLs the pools expect.
-    ...(parsed.DATABASE_URL === undefined && parsed.DB_HOST && parsed.DB_OWNER_USER && parsed.DB_OWNER_PASSWORD
+    ...(parsed.DATABASE_URL === undefined &&
+    parsed.DB_HOST &&
+    parsed.DB_OWNER_USER &&
+    parsed.DB_OWNER_PASSWORD
       ? { DATABASE_URL: composeUrl(parsed.DB_OWNER_USER, parsed.DB_OWNER_PASSWORD, parsed) }
       : {}),
-    ...(parsed.DATABASE_APP_URL === undefined && parsed.DB_HOST && parsed.DB_APP_USER && parsed.DB_APP_PASSWORD
+    ...(parsed.DATABASE_APP_URL === undefined &&
+    parsed.DB_HOST &&
+    parsed.DB_APP_USER &&
+    parsed.DB_APP_PASSWORD
       ? { DATABASE_APP_URL: composeUrl(parsed.DB_APP_USER, parsed.DB_APP_PASSWORD, parsed) }
       : {}),
   };

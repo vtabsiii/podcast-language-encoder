@@ -21,10 +21,14 @@ export async function migrate(owner: pg.Pool, opts: MigrateOptions = {}): Promis
       'CREATE TABLE IF NOT EXISTS schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',
     );
     if (opts.createAppRole) {
+      // Create the least-privilege role, or realign its password with the secret in use
+      // (Secrets Manager rotation in AWS, the dev default locally).
       const pw = (opts.appRolePassword ?? 'polycast_app').replace(/'/g, "''");
       await client.query(`DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'polycast_app') THEN
           CREATE ROLE polycast_app LOGIN PASSWORD '${pw}' NOSUPERUSER NOBYPASSRLS;
+        ELSE
+          ALTER ROLE polycast_app WITH LOGIN PASSWORD '${pw}' NOSUPERUSER NOBYPASSRLS;
         END IF;
       END $$;`);
     }

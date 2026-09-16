@@ -8,7 +8,11 @@ import type { JobState } from '@polycast/domain';
  * orchestrators share. Wiring it as the live orchestrator is the M2 deploy smoke test.
  */
 export interface StepFunctionsClientPort {
-  startExecution(input: { stateMachineArn: string; name: string; input: string }): Promise<{ executionArn: string }>;
+  startExecution(input: {
+    stateMachineArn: string;
+    name: string;
+    input: string;
+  }): Promise<{ executionArn: string }>;
   sendTaskSuccess(input: { taskToken: string; output: string }): Promise<void>;
   sendTaskFailure(input: { taskToken: string; error: string; cause: string }): Promise<void>;
   sendTaskHeartbeat(input: { taskToken: string }): Promise<void>;
@@ -43,9 +47,17 @@ export class StepFunctionsOrchestrator {
   }
 
   /** Called by the internal result endpoint when a task carries a Step Functions token. */
-  async completeStage(taskToken: string, result: { ok: true; nextState: JobState | null } | { ok: false; code: string; message: string; retryable: boolean }): Promise<void> {
+  async completeStage(
+    taskToken: string,
+    result:
+      | { ok: true; nextState: JobState | null }
+      | { ok: false; code: string; message: string; retryable: boolean },
+  ): Promise<void> {
     if (result.ok) {
-      await this.opts.client.sendTaskSuccess({ taskToken, output: JSON.stringify({ nextState: result.nextState }) });
+      await this.opts.client.sendTaskSuccess({
+        taskToken,
+        output: JSON.stringify({ nextState: result.nextState }),
+      });
       return;
     }
     // Retryable failures surface as a distinct error name so the state machine's Retry matches it.

@@ -67,17 +67,22 @@ arrive with M2.
 
 ## M2 — AWS dev path
 
-- [ ] CDK `PolycastNetwork`: VPC, private subnets, endpoints for S3/ECR/Logs/SecretsManager
-- [ ] CDK `PolycastStorage`: quarantine, source (versioned, object lock governance), derived, deliverables buckets; lifecycle rules per retention map
-- [ ] CDK `PolycastData`: Aurora PostgreSQL Serverless v2, PITR, secret rotation
-- [ ] CDK `PolycastAuth`: Cognito user pool, app client, hosted UI, pre-token trigger adding org claims
-- [ ] CDK `PolycastApi`: ECS Fargate service for `apps/api` behind ALB, autoscaling, SSE idle timeout tuned
-- [ ] CDK `PolycastWeb`: CloudFront + S3 static assets + Fargate SSR origin (ADR-0001)
-- [ ] CDK `PolycastOrchestration`: parent and child Step Functions (Standard), EventBridge bus, SQS work queues and DLQs per stage
-- [ ] CloudFront signed URLs for proxy/deliverable access; key group rotation
-- [ ] Alarms: DLQ depth, stage p95, API 5xx, Aurora ACU, budget
-- [ ] Cost allocation tags on all resources (NFR-012)
-- [ ] Widen GitHub OIDC role for new services; deploy to dev; smoke test the M1 slice against AWS
+Written, unit-tested with CDK assertions and synthesized in CI; **not deployed** (owner's decision:
+paid resources only through the manual `deploy-polycast` workflow, see `docs/aws-setup.md` and
+`docs/adr/0006-m2-aws-topology.md`).
+
+- [x] CDK `PolycastNetwork`: VPC, private subnets, endpoints for S3/ECR/Logs/SecretsManager/STS/SQS/StepFunctions, flow logs
+- [x] CDK `PolycastStorage`: quarantine, source (versioned, object lock governance), derived, deliverables buckets; lifecycle rules per retention map; one KMS key
+- [x] CDK `PolycastData`: Aurora PostgreSQL Serverless v2, 35-day PITR, secret rotation, app-role secret, capacity alarms
+- [x] CDK `PolycastAuth`: Cognito user pool, app client, hosted UI, pre-token trigger adding org claims (`infra/lambda/pre-token-generation`); API verifies RS256 tokens against the pool JWKS (`apps/api/src/auth/cognito.ts`)
+- [x] CDK `PolycastApi`: ECS Fargate service for `apps/api` behind an internal ALB (300 s idle timeout for SSE), autoscaling, migration task definition (`apps/api/src/db/migrate-cli.ts`), alarms
+- [x] CDK `PolycastWeb`: CloudFront + S3 static assets + Fargate SSR origin behind an origin-verify header (ADR-0001, ADR-0006)
+- [x] CDK `PolycastOrchestration`: parent and child Step Functions (Standard) generated from the stage table, EventBridge bus, SQS stage/review queues with DLQs, media worker service, budget
+- [x] CloudFront signed URLs for proxy/deliverable access via a key group (created when a public key is supplied; rotation documented)
+- [x] Alarms: DLQ depth, executions failed, API 5xx, unhealthy hosts, Aurora ACU, budget
+- [x] Cost allocation tags on all resources (NFR-012)
+- [x] Step Functions adapter in the API (`apps/api/src/orchestrator/step-functions.ts`, unit-tested behind a client port); Dockerfiles for api, web and worker
+- [ ] Widen GitHub OIDC role for new services; deploy to dev; smoke test the M1 slice against AWS — blocked until the owner runs the manual deploy workflow
 
 ## M3 — Real providers behind adapters
 

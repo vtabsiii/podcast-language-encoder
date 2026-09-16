@@ -1,0 +1,79 @@
+name: Deploy Polycast (manual)
+
+# MANUAL ONLY. Deploys the seven Polycast* stacks (network, storage, Aurora, Cognito, API,
+# orchestration, web) to the dev account. These create PAID resources (NAT gateway, Fargate
+# tasks, Aurora Serverless v2, CloudFront); see docs/aws-setup.md "Polycast stacks (M2, manual
+# deploy only)" for cost, prerequisites (images pushed to ECR) and the migration step.
+#
+# Never add a push/pull_request trigger here. The legacy encoder keeps deploying from
+# deploy.yml on push to main; the Polycast stacks are deployed only by a human running this
+# workflow with confirm = "deploy-polycast". Authentication is GitHub OIDC (no AWS keys).
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy-polycast" to confirm you want to create/update paid resources'
+        required: true
+        type: string
+      imageTag:
+        description: 'ECR image tag for polycast/api, polycast/web and polycast/media-worker'
+        required: false
+        default: latest
+        type: string
+
+concurrency:
+  group: deploy-polycast
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # required to request the OIDC token
+  contents: read
+
+jobs:
+  deploy:
+    name: cdk deploy Polycast*
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      POLYCAST_IMAGE_TAG: ${{ inputs.imageTag || 'latest' }}
+    steps:
+      - name: Check confirmation
+        if: ${{ inputs.confirm != 'deploy-polycast' }}
+        run: |
+          echo "::error::Refusing to deploy: the confirm input must be exactly 'deploy-polycast'."
+          exit 1
+
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @polycast/infra build
+      - run: pnpm --filter @polycast/infra test -- --ci
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: cdk diff
+        working-directory: infra
+        run: npx cdk diff 'Polycast*' -c polycastImageTag="$POLYCAST_IMAGE_TAG" || true
+
+      - name: cdk deploy
+        working-directory: infra
+        run: >-
+          npx cdk deploy 'Polycast*'
+          --require-approval never
+          -c polycastImageTag="$POLYCAST_IMAGE_TAG"
+          --outputs-file cdk-outputs.json
+
+      - name: Show stack outputs
+        working-directory: infra
+        run: cat cdk-outputs.json
