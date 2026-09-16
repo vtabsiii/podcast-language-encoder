@@ -400,7 +400,9 @@ export class PolycastApiStack extends cdk.Stack {
     new cloudwatch.Alarm(this, 'Http5xxRate', {
       alarmDescription: 'Polycast API: more than 5% of requests answered 5xx for 5 minutes',
       metric: new cloudwatch.MathExpression({
-        expression: '100 * (elb + target) / MAX([requests, 1])',
+        // Division by zero yields no data point (treated as not breaching); metric math does
+        // not allow mixing a scalar into MAX([...]).
+        expression: '100 * (elb + target) / requests',
         usingMetrics: { elb: elb5xx, target: target5xx, requests },
         period,
         label: '5xx %',
