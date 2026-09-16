@@ -117,7 +117,7 @@ export class PolycastWebStack extends cdk.Stack {
     props.apiLoadBalancerSecurityGroup.addIngressRule(
       serviceSecurityGroup,
       ec2.Port.tcp(80),
-      'Polycast web tier -> API internal ALB',
+      'Polycast web tier to API internal ALB',
       true,
     );
 

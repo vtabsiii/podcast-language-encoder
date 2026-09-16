@@ -334,7 +334,7 @@ export class PolycastOrchestrationStack extends cdk.Stack {
     props.apiLoadBalancerSecurityGroup.addIngressRule(
       workerSecurityGroup,
       ec2.Port.tcp(80),
-      'Polycast media worker -> API internal ALB (/internal/v1)',
+      'Polycast media worker to API internal ALB (/internal/v1)',
       true,
     );
     const workerScaling = this.workerService.autoScaleTaskCount({ minCapacity: 1, maxCapacity: 4 });
