@@ -145,6 +145,7 @@ Pass with `-c key=value` (or `cdk.json` context); all are optional.
 | `polycastWebOrigins` | `http://localhost:3000` | comma-separated browser origins: quarantine CORS, API `CORS_ORIGINS`, Cognito callback/sign-out URLs, the web tier's `WEB_ORIGIN`. The workflow resolves it from the deployed `PolycastWeb` stack (`https://<distribution>.cloudfront.net`) |
 | `polycastSesFromAddress` | unset | verified SES sender for worker email notifications; in-app notifications only when unset |
 | `polycastAdminEmail` | unset | email of the first Cognito user; created once with an invitation email (temporary password), existing users are left alone. Workflow input `adminEmail` |
+| `polycastAdminResend` | unset | any new value re-sends the invitation (fresh temporary password) to `polycastAdminEmail` while that user has not signed in. Workflow input `resendInvitation` |
 | `polycastCognitoDomainPrefix` | `polycast-<account id>` | hosted UI domain prefix (globally unique per region) |
 | `polycastMonthlyBudgetUsd` | `200` | monthly cost budget |
 | `polycastCloudFrontPublicKeyPem` | unset | RSA public key; enables the signed `/media/*` behaviour |

@@ -18,6 +18,11 @@ export interface PolycastAuthStackProps extends cdk.StackProps {
    * temporary password) the first time the value is set; an existing user is left alone.
    */
   bootstrapAdminEmail?: string;
+  /**
+   * Any new value re-sends the invitation (a fresh temporary password) to `bootstrapAdminEmail`
+   * while that user has not signed in yet. Leave unset for a normal deploy.
+   */
+  bootstrapAdminResendKey?: string;
 }
 
 /**
@@ -139,6 +144,36 @@ export class PolycastAuthStack extends cdk.Stack {
         }),
       });
       new cdk.CfnOutput(this, 'BootstrapAdminEmail', { value: email });
+
+      if (props.bootstrapAdminResendKey) {
+        new cr.AwsCustomResource(this, 'ResendInvitation', {
+          resourceType: 'Custom::PolycastResendInvitation',
+          onUpdate: {
+            service: 'CognitoIdentityServiceProvider',
+            action: 'adminCreateUser',
+            parameters: {
+              UserPoolId: this.userPool.userPoolId,
+              Username: email,
+              MessageAction: 'RESEND',
+              DesiredDeliveryMediums: ['EMAIL'],
+            },
+            // A new key changes the physical id, which re-runs the call.
+            physicalResourceId: cr.PhysicalResourceId.of(
+              `polycast-resend-invitation:${email}:${props.bootstrapAdminResendKey}`,
+            ),
+            // Nothing to resend once the user has set a permanent password.
+            ignoreErrorCodesMatching: 'UnsupportedUserStateException|UserNotFoundException',
+          },
+          policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+            resources: [this.userPool.userPoolArn],
+          }),
+          installLatestAwsSdk: false,
+          logGroup: new logs.LogGroup(this, 'ResendInvitationLogs', {
+            retention: logs.RetentionDays.ONE_MONTH,
+            removalPolicy: cdk.RemovalPolicy.DESTROY,
+          }),
+        });
+      }
     }
 
     new cdk.CfnOutput(this, 'UserPoolId', { value: this.userPool.userPoolId });

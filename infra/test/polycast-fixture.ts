@@ -13,6 +13,7 @@ export interface PolycastFixtureOptions {
   monthlyBudgetUsd?: number;
   sesFromAddress?: string;
   bootstrapAdminEmail?: string;
+  bootstrapAdminResendKey?: string;
 }
 
 /**
@@ -33,6 +34,7 @@ export function buildPolycastApp(options: PolycastFixtureOptions = {}) {
     domainPrefix: 'polycast-test',
     webOrigins,
     bootstrapAdminEmail: options.bootstrapAdminEmail,
+    bootstrapAdminResendKey: options.bootstrapAdminResendKey,
   });
   const buckets = {
     quarantine: storage.quarantineBucket,

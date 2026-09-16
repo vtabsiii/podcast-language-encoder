@@ -139,6 +139,23 @@ describe('PolycastAuthStack with a bootstrap admin', () => {
     template.hasOutput('BootstrapAdminEmail', { Value: 'owner@example.test' });
   });
 
+  test('re-sends the invitation when a resend key is given', () => {
+    const { auth } = buildPolycastApp({
+      bootstrapAdminEmail: 'owner@example.test',
+      bootstrapAdminResendKey: '2026-09-16T18:00',
+    });
+    const template = Template.fromStack(auth);
+    const [resource] = Object.values(template.findResources('Custom::PolycastResendInvitation'));
+    const call = JSON.stringify(resource.Properties.Update);
+    for (const fragment of ['"MessageAction":"RESEND"', '"Username":"owner@example.test"']) {
+      expect(call).toContain(fragment.replace(/"/g, '\\"'));
+    }
+    expect(JSON.stringify(resource.Properties)).toContain('2026-09-16T18:00');
+    Template.fromStack(
+      buildPolycastApp({ bootstrapAdminEmail: 'owner@example.test' }).auth,
+    ).resourceCountIs('Custom::PolycastResendInvitation', 0);
+  });
+
   test('no bootstrap user without the context key', () => {
     const { auth } = buildPolycastApp();
     Template.fromStack(auth).resourceCountIs('Custom::PolycastBootstrapUser', 0);

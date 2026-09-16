@@ -38,6 +38,11 @@ on:
         required: false
         default: ''
         type: string
+      resendInvitation:
+        description: "Any new value (e.g. today's date and time) re-sends the invitation to adminEmail with a fresh temporary password"
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: deploy-polycast
@@ -57,6 +62,7 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
       SES_FROM_ADDRESS: ${{ inputs.sesFromAddress }}
       ADMIN_EMAIL: ${{ inputs.adminEmail }}
+      ADMIN_RESEND: ${{ inputs.resendInvitation }}
     steps:
       - name: Check confirmation
         if: ${{ inputs.confirm != 'deploy-polycast' }}
@@ -119,6 +125,7 @@ jobs:
           ${WEB_ORIGIN:+-c polycastWebOrigins="$WEB_ORIGIN"}
           ${SES_FROM_ADDRESS:+-c polycastSesFromAddress="$SES_FROM_ADDRESS"}
           ${ADMIN_EMAIL:+-c polycastAdminEmail="$ADMIN_EMAIL"}
+          ${ADMIN_RESEND:+-c polycastAdminResend="$ADMIN_RESEND"}
           || true
 
       - name: cdk deploy
@@ -132,6 +139,7 @@ jobs:
           ${WEB_ORIGIN:+-c polycastWebOrigins="$WEB_ORIGIN"}
           ${SES_FROM_ADDRESS:+-c polycastSesFromAddress="$SES_FROM_ADDRESS"}
           ${ADMIN_EMAIL:+-c polycastAdminEmail="$ADMIN_EMAIL"}
+          ${ADMIN_RESEND:+-c polycastAdminResend="$ADMIN_RESEND"}
           --outputs-file cdk-outputs.json
 
       - name: cdk deploy (second pass with the CloudFront origin)
@@ -146,6 +154,7 @@ jobs:
             -c polycastWebOrigins="https://${domain}" \
             ${SES_FROM_ADDRESS:+-c polycastSesFromAddress="$SES_FROM_ADDRESS"} \
             ${ADMIN_EMAIL:+-c polycastAdminEmail="$ADMIN_EMAIL"} \
+            ${ADMIN_RESEND:+-c polycastAdminResend="$ADMIN_RESEND"} \
             --outputs-file cdk-outputs.json
 
       - name: Show stack outputs

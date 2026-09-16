@@ -52,6 +52,7 @@ cdk.Tags.of(encoder).add('project', 'podcast-language-encoder');
 //   polycastWebOrigins             comma-separated browser origins (CORS, Cognito callbacks)
 //   polycastSesFromAddress         verified SES sender for worker email notifications
 //   polycastAdminEmail             first Cognito user (invitation email with a temporary password)
+//   polycastAdminResend            any new value re-sends that invitation (fresh temporary password)
 //   polycastCognitoDomainPrefix    hosted UI prefix (default polycast-<account id>)
 //   polycastMonthlyBudgetUsd       AWS Budgets limit (default 200)
 //   polycastCloudFrontPublicKeyPem RSA public key enabling the signed /media/* behaviour
@@ -65,6 +66,7 @@ const polycastWebOrigins = (contextString('polycastWebOrigins') ?? 'http://local
   .filter(Boolean);
 const polycastSesFromAddress = contextString('polycastSesFromAddress');
 const polycastAdminEmail = contextString('polycastAdminEmail');
+const polycastAdminResend = contextString('polycastAdminResend');
 const polycastCognitoDomainPrefix =
   contextString('polycastCognitoDomainPrefix') ?? `polycast-${cdk.Aws.ACCOUNT_ID}`;
 const polycastMonthlyBudgetUsd = Number(contextString('polycastMonthlyBudgetUsd') ?? 200);
@@ -90,6 +92,7 @@ const auth = new PolycastAuthStack(app, 'PolycastAuth', {
   domainPrefix: polycastCognitoDomainPrefix,
   webOrigins: polycastWebOrigins,
   bootstrapAdminEmail: polycastAdminEmail,
+  bootstrapAdminResendKey: polycastAdminResend,
   description: 'Polycast Studio: Cognito user pool, client, hosted UI',
 });
 const buckets = {
