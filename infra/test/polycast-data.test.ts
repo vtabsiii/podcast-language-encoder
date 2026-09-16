@@ -64,16 +64,6 @@ describe('PolycastDataStack', () => {
     template.hasOutput('ClusterEndpoint', {});
     template.hasOutput('OwnerSecretArn', {});
     template.hasOutput('AppSecretArn', {});
-    // Transitional: the replaced secret keeps its cross-stack export until PolycastApi has
-    // switched to AppSecretV2 (CloudFormation refuses to delete an export that is in use).
-    template.resourceCountIs('AWS::SecretsManager::Secret', 3); // owner, legacy app, AppSecretV2
-    const outputs = Template.fromStack(data).toJSON().Outputs as Record<
-      string,
-      { Export?: { Name: unknown } }
-    >;
-    const legacyExport = Object.entries(outputs).find(([key]) =>
-      /^ExportsOutputRefAppSecret[0-9A-F]+$/.test(key),
-    );
-    expect(legacyExport).toBeDefined();
+    template.resourceCountIs('AWS::SecretsManager::Secret', 2); // owner, AppSecretV2
   });
 });
