@@ -189,20 +189,36 @@ Pass with `-c key=value` (or `cdk.json` context); all are optional.
 
 ### Users and organizations
 
-Users are created by an administrator (self sign-up is off). Membership is carried on the
-user as `custom:org_ids` (space-separated organization ids) and `custom:role`; the pre-token
-trigger turns them into the `org_ids` (JSON array) and `role` claims the API expects.
+Users are created by an administrator (self sign-up is off). The API provisions the matching
+`users` row just in time: the first request that carries a valid ID token for an unseen `sub`
+creates it from the token's `email` and `name` claims. Membership lives in the database, not in
+Cognito. A user who signs in with no membership yet is shown the "create your organization"
+step on the web sign-in page, which calls `POST /api/v1/organizations`; the caller becomes that
+organization's `owner` and every membership-scoped route works from the next request on.
+Until then such a user gets `403 FORBIDDEN` (`No organization membership`) from every
+tenant-scoped route, including `GET /api/v1/me`.
 
 ```bash
 aws cognito-idp admin-create-user --user-pool-id <UserPoolId> --username producer@example.com \
   --user-attributes Name=email,Value=producer@example.com Name=email_verified,Value=true Name=name,Value="Producer" \
   --desired-delivery-mediums EMAIL
+```
+
+The `custom:org_ids` attribute (space-separated organization ids) and `custom:role` are now
+optional. The pre-token trigger still copies them into the `org_ids` (JSON array) and `role`
+claims, but the API only uses `org_ids` to pick the default organization for a request that
+sends no `X-Organization-Id`; an id the user is not actually a member of is ignored and the
+oldest membership is used instead. The `role` claim is never used for authorization.
+
+```bash
+# Optional: make <orgId1> the default organization for a user who belongs to several.
 aws cognito-idp admin-update-user-attributes --user-pool-id <UserPoolId> --username producer@example.com \
-  --user-attributes "Name=custom:org_ids,Value=<orgId1> <orgId2>" Name=custom:role,Value=producer
+  --user-attributes "Name=custom:org_ids,Value=<orgId1> <orgId2>"
 ```
 
 The trigger customises the **ID token** (Cognito V1 trigger); the web tier sends the ID token
-as the bearer to the API. Changing an attribute takes effect at the next token refresh.
+as the bearer to the API, and the ID token is what carries `email` and `name` for provisioning.
+Changing an attribute takes effect at the next token refresh.
 
 ### CloudFront signed media and the key group
 

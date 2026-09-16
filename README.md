@@ -61,7 +61,9 @@ pnpm dev                                  # docker compose (Postgres, MinIO) + a
 `pnpm dev` is the one-command bring-up: the API migrates the database on boot, the worker polls
 the API's internal task endpoints, and the web app proxies `/api/v1/*` to the API. Sign in at
 http://localhost:3000/login (local dev sign-in; never enabled in production), create an
-organization, and start a localization. Individual services: `pnpm --filter @polycast/api dev`
+organization, and start a localization. In every auth mode a signed-in user without a
+membership creates their first organization through `POST /api/v1/organizations` (they become
+its owner); until then tenant-scoped routes answer `403 FORBIDDEN`. Individual services: `pnpm --filter @polycast/api dev`
 (Swagger UI at http://127.0.0.1:4000/docs), `pnpm --filter @polycast/web dev`,
 `pnpm --filter @polycast/media-worker dev`.
 

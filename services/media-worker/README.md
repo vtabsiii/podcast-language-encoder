@@ -65,13 +65,14 @@ mode ffmpeg is required for TIMING (atempo) and MIXING (remix + loudnorm).
 | `POLLY_ENGINE` | `neural` | `neural`, `long-form` or `generative` |
 | `ENCODE_PROVIDER` | `ffmpeg` | `ffmpeg` (in-worker) or `mediaconvert` |
 | `MEDIACONVERT_ROLE_ARN`, `MEDIACONVERT_QUEUE_ARN` | – | required when `ENCODE_PROVIDER=mediaconvert` |
-| `SES_FROM_ADDRESS` | – | verified SES sender; required in production. Without it notifications fall back to the in-app list |
+| `SES_FROM_ADDRESS` | – | verified SES sender; optional. Without it email notifications are off and every notification goes to the in-app list only |
 | `TRANSCRIBE_DATA_ACCESS_ROLE_ARN` | – | optional `JobExecutionSettings.DataAccessRoleArn` for Transcribe |
 
 Production (`POLYCAST_ENV=production`) refuses to start unless `PROVIDER_MODE=aws`,
-`STORAGE_DRIVER=s3`, a non-default `WORKER_TOKEN`, `WORKER_QUEUE_URL`, `MEDIA_BUCKET_SOURCE`
-and `SES_FROM_ADDRESS` are all set (`config.py`). Enum values are validated in every
-environment, and `ENCODE_PROVIDER=mediaconvert` without both ARNs is rejected.
+`STORAGE_DRIVER=s3`, a non-default `WORKER_TOKEN`, `WORKER_QUEUE_URL` and `MEDIA_BUCKET_SOURCE`
+are all set (`config.py`). `SES_FROM_ADDRESS` is optional: without it email notifications are
+off and the in-app list is the only channel. Enum values are validated in every environment,
+and `ENCODE_PROVIDER=mediaconvert` without both ARNs is rejected.
 
 Status: every AWS adapter is **contract-tested against recorded responses**
 (`tests/fixtures/providers/`, driven through `botocore.stub.Stubber`); none has yet been run
