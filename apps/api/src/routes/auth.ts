@@ -12,43 +12,12 @@ import { signToken } from '../auth/jwt.js';
 import { principalOf, requireAuth } from '../auth/principal.js';
 import type { AppConfig } from '../config.js';
 import type { Db } from '../db/pool.js';
+import { ORG_COLUMNS, orgView, userView, type OrgRow, type UserRow } from './views.js';
 
 export interface AuthRouteOptions {
   config: AppConfig;
   db: Db;
 }
-
-interface OrgRow {
-  id: string;
-  name: string;
-  plan: string;
-  region: string;
-  retention_days: number;
-  monthly_budget_cents: number | null;
-  status: 'active' | 'suspended' | 'deleting';
-}
-interface UserRow {
-  id: string;
-  email: string;
-  display_name: string;
-  created_at: Date;
-}
-
-const orgView = (o: OrgRow) => ({
-  id: o.id,
-  name: o.name,
-  plan: o.plan,
-  region: o.region,
-  retentionDays: o.retention_days,
-  monthlyBudgetCents: o.monthly_budget_cents,
-  status: o.status,
-});
-const userView = (u: UserRow) => ({
-  id: u.id,
-  email: u.email,
-  displayName: u.display_name,
-  createdAt: u.created_at.toISOString(),
-});
 
 /**
  * /auth/dev-login (local mode only) and /me. The dev login provisions the user and, when asked,
@@ -102,7 +71,7 @@ export const authRoutes: FastifyPluginAsyncZod<AuthRouteOptions> = async (app, o
             const orgId = uuidv7();
             org = (
               await tx.query<OrgRow>(
-                'INSERT INTO organizations (id, name) VALUES ($1,$2) RETURNING id, name, plan, region, retention_days, monthly_budget_cents, status',
+                `INSERT INTO organizations (id, name) VALUES ($1,$2) RETURNING ${ORG_COLUMNS}`,
                 [orgId, body.organizationName],
               )
             ).rows[0];
@@ -135,10 +104,9 @@ export const authRoutes: FastifyPluginAsyncZod<AuthRouteOptions> = async (app, o
             if (!chosen) throw new DomainError('FORBIDDEN', 'No organization membership');
             role = chosen.role;
             org = (
-              await tx.query<OrgRow>(
-                'SELECT id, name, plan, region, retention_days, monthly_budget_cents, status FROM organizations WHERE id = $1',
-                [chosen.organization_id],
-              )
+              await tx.query<OrgRow>(`SELECT ${ORG_COLUMNS} FROM organizations WHERE id = $1`, [
+                chosen.organization_id,
+              ])
             ).rows[0];
           }
           if (!org) throw new DomainError('FORBIDDEN', 'No organization membership');

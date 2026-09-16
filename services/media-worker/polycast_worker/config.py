@@ -1,4 +1,9 @@
-"""Worker configuration. Production fails closed on missing providers, tokens or storage."""
+"""Worker configuration. Production fails closed on missing providers, tokens or storage.
+
+Email notifications are the one optional production integration: without ``SES_FROM_ADDRESS``
+the registry falls back to the in-app notifier, so notifications land in the derived bucket's
+``notifications.json`` and no email is sent until a verified sender is configured.
+"""
 
 from __future__ import annotations
 
@@ -39,6 +44,7 @@ class WorkerConfig:
     encode_provider: str = "ffmpeg"
     mediaconvert_role_arn: str | None = None
     mediaconvert_queue_arn: str | None = None
+    # Optional in every environment: unset means email notifications are off (in-app only).
     ses_from_address: str | None = None
     transcribe_data_access_role_arn: str | None = None
     derived_bucket: str = DEFAULT_DERIVED_BUCKET
@@ -101,7 +107,6 @@ class WorkerConfig:
                     ("WORKER_QUEUE_URL", cfg.queue_url),
                     ("MEDIA_BUCKET_SOURCE", cfg.source_bucket),
                     ("WORKER_TOKEN", cfg.worker_token),
-                    ("SES_FROM_ADDRESS", cfg.ses_from_address),
                 )
                 if not v
             ]
