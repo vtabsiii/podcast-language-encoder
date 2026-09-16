@@ -15,6 +15,11 @@ import { api } from '@/lib/client-api';
 import { describeError } from '@/lib/errors';
 import { formatDateTime, humanizeState } from '@/lib/format';
 import { budgetUsePercent, formatMediaTime, formatRange, toPlayerSeconds } from '@/lib/time';
+import {
+  describeOpenIssueProgress,
+  nextOpenIssueIndex,
+  openIssueProgress,
+} from '@/lib/review-issues';
 import { isStageChanged } from '@/lib/sse';
 import { useProjectEvents } from '@/lib/use-project-events';
 import { JobStateBadge } from '@/components/state-badge';
@@ -30,6 +35,7 @@ export interface ReviewStudioProps {
 const SHORTCUTS: Array<[string, string]> = [
   ['j / ↓', 'Next segment'],
   ['k / ↑', 'Previous segment'],
+  ['n', 'Next segment with an open issue'],
   ['Enter', 'Focus segment detail'],
   ['r', 'Regenerate translation for the selected segment'],
   ['a', 'Approve the selected segment'],
@@ -41,6 +47,14 @@ function isTyping(target: EventTarget | null): boolean {
   const tag = target.tagName;
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
 }
+
+/** Mirrors the `.studio` breakpoint in globals.css, below which the studio is a single column. */
+const NARROW_STUDIO = '(max-width: 960px)';
+function isNarrowViewport(): boolean {
+  return typeof window !== 'undefined' && !!window.matchMedia?.(NARROW_STUDIO).matches;
+}
+
+const compactButton = { padding: 'var(--pc-space-2) var(--pc-space-3)', fontSize: 13 } as const;
 
 export function ReviewStudio({
   projectId,
@@ -113,18 +127,31 @@ export function ReviewStudio({
   });
 
   const select = useCallback(
-    (index: number, seek = true) => {
+    (index: number, { seek = true, focusDetail = false } = {}) => {
       const seg = segments[index];
       if (!seg) return;
       setSelectedId(seg.segment.id);
       if (seek && audioRef.current)
         audioRef.current.currentTime = toPlayerSeconds(seg.segment.range.start);
       listRef.current
-        ?.querySelector<HTMLElement>(`[data-segment-id="${seg.segment.id}"] button`)
+        ?.querySelector<HTMLElement>(`[data-segment-id="${seg.segment.id}"] > button`)
         ?.scrollIntoView({ block: 'nearest' });
+      if (focusDetail) {
+        // Focusing also scrolls the panel into view (it sits above the list on narrow screens).
+        detailRef.current?.focus();
+      } else if (isNarrowViewport()) {
+        // Single-column layout: the editor is out of sight behind a tall list, so bring it back.
+        detailRef.current?.scrollIntoView({ block: 'start' });
+      }
     },
     [segments],
   );
+
+  const issueProgress = openIssueProgress(segments, selectedIndex);
+  const goToNextOpenIssue = useCallback(() => {
+    const idx = nextOpenIssueIndex(segments, selectedIndex);
+    if (idx >= 0) select(idx, { focusDetail: true });
+  }, [segments, selectedIndex, select]);
 
   const regenerate = useCallback(
     async (seg: ReviewSegment | null, stage: RegenerateRequest['stage'] = 'translation') => {
@@ -249,6 +276,10 @@ export function ReviewStudio({
           e.preventDefault();
           select(Math.max(0, selectedIndex - 1));
           break;
+        case 'n':
+          e.preventDefault();
+          goToNextOpenIssue();
+          break;
         case 'Enter':
           if (e.target instanceof HTMLElement && e.target.closest('.segment-list')) {
             e.preventDefault();
@@ -272,12 +303,10 @@ export function ReviewStudio({
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [segments.length, selectedIndex, selected, select, regenerate, approve]);
+  }, [segments.length, selectedIndex, selected, select, regenerate, approve, goToNextOpenIssue]);
 
-  const canApproveTarget =
-    review.openIssues === 0 &&
-    busy === null &&
-    (review.target.state === 'NEEDS_REVIEW' || review.target.state === 'READY');
+  const reviewable = review.target.state === 'NEEDS_REVIEW' || review.target.state === 'READY';
+  const canApproveTarget = review.openIssues === 0 && busy === null && reviewable;
   const dir = review.direction;
   const segmentComments = comments.filter((c) => c.segmentId === selected?.segment.id);
 
@@ -293,19 +322,29 @@ export function ReviewStudio({
             Review <span lang={review.target.locale}>{review.target.locale}</span>
             <span className="muted small"> from {review.sourceLocale}</span>
           </h1>
-          <div className="row" aria-live="polite">
-            <JobStateBadge state={review.target.state} />
-            <StatusBadge tone={review.openIssues === 0 ? 'ok' : 'warn'}>
-              {review.openIssues} open issue{review.openIssues === 1 ? '' : 's'}
-            </StatusBadge>
-            <Button
-              type="button"
-              onClick={() => approve([])}
-              disabled={!canApproveTarget}
-              aria-busy={busy === 'approve-target'}
-            >
-              Approve target
-            </Button>
+          <div className="stack" style={{ gap: 'var(--pc-space-1)' }}>
+            <div className="row" aria-live="polite">
+              <JobStateBadge state={review.target.state} />
+              <StatusBadge tone={review.openIssues === 0 ? 'ok' : 'warn'}>
+                {review.openIssues} open issue{review.openIssues === 1 ? '' : 's'}
+              </StatusBadge>
+              <Button
+                type="button"
+                onClick={() => approve([])}
+                disabled={!canApproveTarget}
+                aria-busy={busy === 'approve-target'}
+                aria-describedby={review.openIssues > 0 ? 'approve-target-hint' : undefined}
+              >
+                Approve target
+              </Button>
+            </div>
+            {review.openIssues > 0 && (
+              <p id="approve-target-hint" className="muted small" style={{ margin: 0 }}>
+                Resolve the {review.openIssues} remaining open issue
+                {review.openIssues === 1 ? '' : 's'} first (accept, dismiss, edit or regenerate each
+                flagged segment).
+              </p>
+            )}
           </div>
         </div>
 
@@ -361,8 +400,27 @@ export function ReviewStudio({
         </p>
       )}
 
+      <div className="issue-nav" role="group" aria-label="Open issue navigation">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={goToNextOpenIssue}
+          disabled={issueProgress.total === 0}
+          aria-keyshortcuts="n"
+        >
+          Next open issue
+        </Button>
+        <span className="muted small">
+          {issueProgress.total === 0
+            ? reviewable
+              ? 'No open issues remain — the target can be approved.'
+              : 'No open issues remain.'
+            : describeOpenIssueProgress(issueProgress)}
+        </span>
+      </div>
+
       <div className="studio">
-        <section aria-labelledby="segments-heading">
+        <section aria-labelledby="segments-heading" className="studio-list">
           <h2 id="segments-heading">Segments ({segments.length})</h2>
           <ol className="segment-list" ref={listRef} aria-label="Segments">
             {segments.map((s, i) => {
@@ -398,13 +456,60 @@ export function ReviewStudio({
                       )}
                     </p>
                   </button>
+                  {isSel && open.length > 0 && (
+                    <div
+                      className="segment-actions"
+                      role="group"
+                      aria-label={`Open issues on segment ${s.segment.seq + 1}`}
+                    >
+                      {open.map((iss) => (
+                        <span key={iss.id} className="row">
+                          <span className="small">{iss.metric}</span>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            style={compactButton}
+                            aria-label={`Accept ${iss.metric} issue`}
+                            onClick={() => resolveIssue(iss, 'accepted')}
+                            disabled={busy !== null}
+                          >
+                            Accept
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            style={compactButton}
+                            aria-label={`Dismiss ${iss.metric} issue`}
+                            onClick={() => resolveIssue(iss, 'dismissed')}
+                            disabled={busy !== null}
+                          >
+                            Dismiss
+                          </Button>
+                        </span>
+                      ))}
+                      <Button
+                        type="button"
+                        style={compactButton}
+                        onClick={() => regenerate(s)}
+                        disabled={busy !== null}
+                        aria-busy={busy === `regen-${s.segment.id}`}
+                      >
+                        Regenerate translation
+                      </Button>
+                    </div>
+                  )}
                 </li>
               );
             })}
           </ol>
         </section>
 
-        <section aria-labelledby="detail-heading" ref={detailRef} tabIndex={-1} className="card">
+        <section
+          aria-labelledby="detail-heading"
+          ref={detailRef}
+          tabIndex={-1}
+          className="card studio-detail"
+        >
           {!selected ? (
             <p className="muted">No segment selected.</p>
           ) : (
