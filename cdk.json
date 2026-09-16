@@ -17,6 +17,8 @@
   "context": {
     "githubOwner": "vtabsiii",
     "githubRepo": "podcast-language-encoder",
+    "githubOwnerId": "300263445",
+    "githubRepoId": "1372306122",
     "targetLanguages": "es,fr,de,pt",
     "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
     "@aws-cdk/core:checkSecretUsage": true,
