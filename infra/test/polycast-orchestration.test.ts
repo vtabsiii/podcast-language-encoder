@@ -120,7 +120,7 @@ describe('PolycastOrchestrationStack', () => {
     template.hasResourceProperties('AWS::EC2::SecurityGroupIngress', {
       FromPort: 80,
       ToPort: 80,
-      Description: 'Polycast media worker -> API internal ALB (/internal/v1)',
+      Description: 'Polycast media worker to API internal ALB (/internal/v1)',
     });
   });
 

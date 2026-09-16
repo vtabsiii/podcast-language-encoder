@@ -79,7 +79,7 @@ describe('PolycastWebStack', () => {
       IpProtocol: 'tcp',
       FromPort: 80,
       ToPort: 80,
-      Description: 'Polycast web tier -> API internal ALB',
+      Description: 'Polycast web tier to API internal ALB',
       GroupId: Match.objectLike({ 'Fn::ImportValue': Match.anyValue() }),
     });
   });
