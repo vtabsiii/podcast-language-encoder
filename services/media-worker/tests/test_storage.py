@@ -152,6 +152,21 @@ def test_s3_storage_maps_operations_onto_the_client(tmp_path: Path):
         store.get("local://derived/x/y")
 
 
+def test_real_client_presigns_with_signature_v4(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SSE-KMS objects can only be fetched through SigV4 URLs; SigV2 is botocore's us-east-1
+    default and S3 answers it with 400, which the lip-sync vendor reported as inaccessible."""
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIAEXAMPLE")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "not-a-real-secret")
+    monkeypatch.setenv("AWS_SESSION_TOKEN", "session-token")
+    store = S3Storage(region="us-east-1")
+    url = store.presigned_get_url("s3://polycast-source-1-us-east-1/org/asset/source.mp4", 900)
+    query = dict(part.split("=", 1) for part in url.split("?", 1)[1].split("&"))
+    assert query["X-Amz-Algorithm"] == "AWS4-HMAC-SHA256"
+    assert query["X-Amz-Expires"] == "900"
+    assert "X-Amz-Security-Token" in query
+    assert "AWSAccessKeyId" not in query and "Signature" not in query
+
+
 def test_presigned_get_urls(tmp_path: Path):
     store = S3Storage(client=_FakeS3())
     url = store.presigned_get_url("s3://derived/org/t/lip-sync/speech-track.wav", 1800)
