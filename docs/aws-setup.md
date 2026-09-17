@@ -145,7 +145,7 @@ Pass with `-c key=value` (or `cdk.json` context); all are optional.
 | `polycastWebOrigins` | `http://localhost:3000` | comma-separated browser origins: quarantine CORS, API `CORS_ORIGINS`, Cognito callback/sign-out URLs, the web tier's `WEB_ORIGIN`. The workflow resolves it from the deployed `PolycastWeb` stack (`https://<distribution>.cloudfront.net`) |
 | `polycastSesFromAddress` | unset | verified SES sender for worker email notifications; in-app notifications only when unset |
 | `polycastAdminEmail` | unset | email of the first Cognito user; created once with an invitation email (temporary password), existing users are left alone. Workflow input `adminEmail` |
-| `polycastLipSyncProvider` | `mock` | lip-sync vendor for the media worker: `mock` (lip sync reported as not applied) or `synclabs` (sync.so). Workflow input `lipSyncProvider` |
+| `polycastLipSyncProvider` | `mock` | lip-sync vendor for the media worker: `mock` (lip sync reported as not applied) or `synclabs` (sync.so). Workflow input `lipSyncProvider`; the key itself travels as the `SyncLabsApiKeyParameter` stack parameter |
 | `polycastAdminResend` | unset | any new value re-sends the invitation (fresh temporary password) to `polycastAdminEmail` while that user has not signed in. Workflow input `resendInvitation` |
 | `polycastCognitoDomainPrefix` | `polycast-<account id>` | hosted UI domain prefix (globally unique per region) |
 | `polycastMonthlyBudgetUsd` | `200` | monthly cost budget |
@@ -179,19 +179,24 @@ equivalent is `cd infra && npx cdk deploy 'Polycast*' -c polycastWebOrigins=http
 ### Lip sync (sync.so)
 
 The worker's lip-sync adapter calls sync.so (`services/media-worker/polycast_worker/providers/synclabs.py`).
-`PolycastOrchestration` creates the secret `polycast/synclabs` with an empty `apiKey` field and
-injects it as `SYNCLABS_API_KEY`; the worker refuses to start with `LIP_SYNC_PROVIDER=synclabs`
-and an empty key. To enable it:
+`PolycastOrchestration` owns the secret `polycast/synclabs` and injects its `apiKey` field as
+`SYNCLABS_API_KEY`; the worker refuses to start with `LIP_SYNC_PROVIDER=synclabs` and an empty
+key. To enable it:
 
-1. Create an API key at https://sync.so and store it: Secrets Manager → `polycast/synclabs` →
-   Retrieve/Edit secret value → set `apiKey` (or
-   `aws secretsmanager put-secret-value --secret-id polycast/synclabs --secret-string '{"apiKey":"<key>"}'`).
-2. Run the `Deploy Polycast (manual)` workflow with `lipSyncProvider = synclabs`. The new task
-   definition picks the key up; targets submitted with lip sync on a video asset then get a
-   synced render, and the deliverable is encoded from it.
+1. Create an API key in the sync.so dashboard.
+2. Store it as the GitHub Actions repository secret `SYNCLABS_API_KEY` (repository Settings →
+   Secrets and variables → Actions → New repository secret). It is a vendor key, not an AWS
+   credential; AWS access stays OIDC-only.
+3. Run the `Deploy Polycast (manual)` workflow. With the secret present and `lipSyncProvider`
+   left empty the run selects `synclabs`, passes the key to `PolycastOrchestration` as the NoEcho
+   stack parameter `SyncLabsApiKeyParameter` (never printed, never in the template), and
+   CloudFormation writes it into the `polycast/synclabs` secret. Later runs without the secret
+   keep the stored value (`cdk deploy --previous-parameters`).
 
-Set `lipSyncProvider = mock` (or leave it empty) to go back to reporting lip sync as not
-applied. The vendor tier stays `beta` until `docs/quality-benchmark.md` promotes it.
+Targets submitted with lip sync on a video asset then get a synced render and the deliverable is
+encoded from it. Rotate the key by updating the repository secret and deploying again. Set
+`lipSyncProvider = mock` to go back to reporting lip sync as not applied. The vendor tier stays
+`beta` until `docs/quality-benchmark.md` promotes it.
 
 ### Users and organizations
 

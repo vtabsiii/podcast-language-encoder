@@ -39,7 +39,7 @@ on:
         default: ''
         type: string
       lipSyncProvider:
-        description: 'Lip-sync vendor for the media worker: mock (default) or synclabs (store the API key in the polycast/synclabs secret first)'
+        description: 'Lip-sync vendor for the media worker: mock or synclabs. Empty = synclabs when the SYNCLABS_API_KEY repository secret is set, otherwise mock'
         required: false
         default: ''
         type: string
@@ -68,7 +68,11 @@ jobs:
       SES_FROM_ADDRESS: ${{ inputs.sesFromAddress }}
       ADMIN_EMAIL: ${{ inputs.adminEmail }}
       ADMIN_RESEND: ${{ inputs.resendInvitation }}
-      LIP_SYNC_PROVIDER: ${{ inputs.lipSyncProvider }}
+      LIP_SYNC_PROVIDER: ${{ inputs.lipSyncProvider || (secrets.SYNCLABS_API_KEY && 'synclabs') || '' }}
+      # Vendor key for lip sync (not an AWS credential). Passed to PolycastOrchestration as a
+      # NoEcho stack parameter that fills the polycast/synclabs secret; omitted when unset so the
+      # stack keeps its previous value.
+      SYNCLABS_API_KEY: ${{ secrets.SYNCLABS_API_KEY }}
     steps:
       - name: Check confirmation
         if: ${{ inputs.confirm != 'deploy-polycast' }}
@@ -133,6 +137,7 @@ jobs:
           ${ADMIN_EMAIL:+-c polycastAdminEmail="$ADMIN_EMAIL"}
           ${ADMIN_RESEND:+-c polycastAdminResend="$ADMIN_RESEND"}
           ${LIP_SYNC_PROVIDER:+-c polycastLipSyncProvider="$LIP_SYNC_PROVIDER"}
+          ${SYNCLABS_API_KEY:+--parameters PolycastOrchestration:SyncLabsApiKeyParameter="$SYNCLABS_API_KEY"}
           || true
 
       - name: cdk deploy
@@ -148,6 +153,7 @@ jobs:
           ${ADMIN_EMAIL:+-c polycastAdminEmail="$ADMIN_EMAIL"}
           ${ADMIN_RESEND:+-c polycastAdminResend="$ADMIN_RESEND"}
           ${LIP_SYNC_PROVIDER:+-c polycastLipSyncProvider="$LIP_SYNC_PROVIDER"}
+          ${SYNCLABS_API_KEY:+--parameters PolycastOrchestration:SyncLabsApiKeyParameter="$SYNCLABS_API_KEY"}
           --outputs-file cdk-outputs.json
 
       - name: cdk deploy (second pass with the CloudFront origin)
@@ -164,6 +170,7 @@ jobs:
             ${ADMIN_EMAIL:+-c polycastAdminEmail="$ADMIN_EMAIL"} \
             ${ADMIN_RESEND:+-c polycastAdminResend="$ADMIN_RESEND"} \
             ${LIP_SYNC_PROVIDER:+-c polycastLipSyncProvider="$LIP_SYNC_PROVIDER"} \
+            ${SYNCLABS_API_KEY:+--parameters PolycastOrchestration:SyncLabsApiKeyParameter="$SYNCLABS_API_KEY"} \
             --outputs-file cdk-outputs.json
 
       - name: Show stack outputs
