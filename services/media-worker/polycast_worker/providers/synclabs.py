@@ -63,6 +63,29 @@ JOB_ID_KEYS = ("id", "jobId", "job_id")
 CONFIDENCE_KEYS = ("syncConfidence", "confidence")
 
 _SAFE_ID_RE = re.compile(r"[^A-Za-z0-9_.-]+")
+_URL_RE = re.compile(r"[a-z][a-z0-9+.-]*://\S+", re.IGNORECASE)
+_UNSAFE_RE = re.compile(r"[^\w\s.,:;()\[\]'\"/%-]+")
+MAX_ERROR_BODY_BYTES = 4096
+MAX_REASON_CHARS = 200
+
+
+def _error_text(payload: Any) -> str | None:
+    """The human-readable message of a vendor error body, whatever its nesting."""
+    if isinstance(payload, str):
+        return payload
+    if isinstance(payload, dict):
+        for key in ("message", "error", "detail", "errors"):
+            if key in payload:
+                found = _error_text(payload[key])
+                if found:
+                    return found
+        return None
+    if isinstance(payload, list):
+        for item in payload:
+            found = _error_text(item)
+            if found:
+                return found
+    return None
 
 
 def safe_job_id(job_id: str) -> str:
@@ -266,7 +289,7 @@ class SyncLabsLipSyncProvider:
             with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_S) as resp:  # noqa: S310
                 raw = resp.read(MAX_RESPONSE_BYTES + 1)
         except urllib.error.HTTPError as e:
-            raise self._http_error(e.code) from e
+            raise self._http_error(e.code, self._vendor_reason(e)) from e
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             raise ProviderError(
                 "PROVIDER_UNAVAILABLE", "sync.so could not be reached.", retryable=True
@@ -287,19 +310,56 @@ class SyncLabsLipSyncProvider:
             )
         return payload
 
+    def _vendor_reason(self, error: urllib.error.HTTPError) -> str | None:
+        """The vendor's own explanation of a 4xx, reduced to a short plain-text fragment.
+
+        Only the `message`/`error` field of a JSON error body is used. URLs (which could be
+        the presigned inputs), the API key and control characters are removed and the text
+        is truncated, so the fragment can sit in a task error without leaking anything.
+        """
+        try:
+            raw = error.read(MAX_ERROR_BODY_BYTES)
+        except (OSError, ValueError):
+            return None
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return None
+        text = _error_text(payload)
+        if not text:
+            return None
+        text = _URL_RE.sub("[url]", text).replace(self._api_key, "[redacted]")
+        text = _UNSAFE_RE.sub(" ", text)
+        text = " ".join(text.split())
+        if len(text) > MAX_REASON_CHARS:
+            text = text[: MAX_REASON_CHARS - 1] + "…"
+        return text or None
+
     @staticmethod
-    def _http_error(code: int) -> ProviderError:
+    def _http_error(code: int, reason: str | None = None) -> ProviderError:
+        detail = f" Vendor says: {reason}" if reason else ""
         if code == 429 or code >= 500:
             return ProviderError(
                 "PROVIDER_THROTTLED",
-                f"sync.so is throttling or unavailable (HTTP {code}).",
+                f"sync.so is throttling or unavailable (HTTP {code}).{detail}",
                 retryable=True,
             )
-        if code in (401, 403):
+        if code == 401:
             return ProviderError(
-                "PROVIDER_ERROR", f"sync.so rejected the credentials (HTTP {code})."
+                "PROVIDER_ERROR",
+                f"sync.so rejected the API key (HTTP 401); check the key in the "
+                f"polycast/synclabs secret.{detail}",
             )
-        return ProviderError("PROVIDER_ERROR", f"sync.so rejected the request (HTTP {code}).")
+        if code == 403:
+            return ProviderError(
+                "PROVIDER_ERROR",
+                f"sync.so refused the request (HTTP 403); this usually means the account's "
+                f"plan does not allow it (for example the free tier's duration limit) or the "
+                f"key lacks access.{detail}",
+            )
+        return ProviderError(
+            "PROVIDER_ERROR", f"sync.so rejected the request (HTTP {code}).{detail}"
+        )
 
     def _store_output(self, url: str, uri: str) -> None:
         req = urllib.request.Request(url, method="GET")  # noqa: S310 - https enforced
