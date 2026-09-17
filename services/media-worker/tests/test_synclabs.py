@@ -287,6 +287,58 @@ def test_transport_errors_map_to_typed_provider_errors(
     assert API_KEY not in info.value.message
 
 
+def _http_error(code: int, body: bytes) -> urllib.error.HTTPError:
+    return urllib.error.HTTPError(BASE, code, "Error", None, io.BytesIO(body))  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("code", "body", "expected", "absent"),
+    [
+        (
+            403,
+            b'{"error":{"message":"Video duration exceeds the free plan limit of 20 seconds"}}',
+            "Vendor says: Video duration exceeds the free plan limit of 20 seconds",
+            (),
+        ),
+        (
+            401,
+            b'{"message":"Invalid API key"}',
+            "rejected the API key (HTTP 401)",
+            (),
+        ),
+        (
+            403,
+            b'{"message":"Cannot fetch https://bucket.s3.amazonaws.com/x?X-Amz-Signature=abc key '
+            + API_KEY.encode()
+            + b'"}',
+            "Vendor says: Cannot fetch [url] key [redacted]",
+            ("X-Amz-Signature", API_KEY, "s3.amazonaws.com"),
+        ),
+        (422, b"not json", "rejected the request (HTTP 422).", ("Vendor says",)),
+        (403, b'{"message":"' + b"x" * 500 + b'"}', "\u2026", ("x" * 300,)),
+    ],
+)
+def test_vendor_reason_is_surfaced_but_sanitised(
+    monkeypatch: pytest.MonkeyPatch,
+    code: int,
+    body: bytes,
+    expected: str,
+    absent: tuple[str, ...],
+) -> None:
+    storage = MemoryStorage()
+    storage.put(VIDEO, b"v", "video/mp4")
+    storage.put(AUDIO, b"a", "audio/wav")
+    monkeypatch.setattr(urllib.request, "urlopen", FakeVendor(fail_with=_http_error(code, body)))
+    provider = _provider(storage)
+    with pytest.raises(ProviderError) as info:
+        provider.render({"videoUri": VIDEO, "audioUri": AUDIO}, _ctx())
+    assert info.value.code == "PROVIDER_ERROR" and not info.value.retryable
+    assert expected in info.value.message
+    for fragment in absent:
+        assert fragment not in info.value.message
+    assert len(info.value.message) < 400
+
+
 def test_bad_create_responses_are_retryable(monkeypatch: pytest.MonkeyPatch) -> None:
     storage = MemoryStorage()
     storage.put(VIDEO, b"v", "video/mp4")
