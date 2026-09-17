@@ -266,6 +266,17 @@ describe('PolycastOrchestrationStack lip-sync provider', () => {
     template.hasOutput('SyncLabsSecretArn', {});
   });
 
+  test('takes the sync.so key from a NoEcho stack parameter so it never sits in the template', () => {
+    const template = Template.fromStack(buildPolycastApp().orchestration);
+    template.hasParameter('SyncLabsApiKeyParameter', { Type: 'String', NoEcho: true, Default: '' });
+    template.hasResourceProperties('AWS::SecretsManager::Secret', {
+      Name: 'polycast/synclabs',
+      SecretString: {
+        'Fn::Join': ['', ['{"apiKey":"', { Ref: 'SyncLabsApiKeyParameter' }, '"}']],
+      },
+    });
+  });
+
   test('selects sync.so when asked', () => {
     Template.fromStack(
       buildPolycastApp({ lipSyncProvider: 'synclabs' }).orchestration,

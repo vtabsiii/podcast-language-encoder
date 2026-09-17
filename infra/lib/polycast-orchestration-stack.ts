@@ -310,14 +310,24 @@ export class PolycastOrchestrationStack extends cdk.Stack {
       }),
     );
 
-    // Third-party lip-sync credentials. Created with an empty key so the deploy never carries
-    // a real value; the owner pastes the vendor key into this secret (field `apiKey`) in the
-    // console or CLI, then redeploys with lipSyncProvider=synclabs. The worker refuses to start
-    // with `synclabs` selected and an empty key (config.py fails closed).
+    // Third-party lip-sync credentials. The key arrives as a NoEcho CloudFormation parameter
+    // (the deploy workflow passes the SYNCLABS_API_KEY repository secret when it is set) and
+    // lands in Secrets Manager; it never appears in the synthesized template, the diff or the
+    // stack's parameter listing. Deploys that omit the parameter keep the previous value
+    // (cdk deploy --previous-parameters is the default), so the key is entered once. The
+    // worker refuses to start with `synclabs` selected and an empty key (config.py fails
+    // closed).
+    const syncLabsApiKey = new cdk.CfnParameter(this, 'SyncLabsApiKeyParameter', {
+      type: 'String',
+      noEcho: true,
+      default: '',
+      description:
+        'sync.so API key for the lip-sync provider (stored in the polycast/synclabs secret; leave empty to keep the current value)',
+    });
     this.syncLabsSecret = new secretsmanager.Secret(this, 'SyncLabsApiKey', {
       secretName: 'polycast/synclabs',
       description: 'Polycast: sync.so API key for the lip-sync provider (field apiKey)',
-      secretObjectValue: { apiKey: cdk.SecretValue.unsafePlainText('') },
+      secretObjectValue: { apiKey: cdk.SecretValue.cfnParameter(syncLabsApiKey) },
     });
 
     const workerTaskDefinition = new ecs.FargateTaskDefinition(this, 'WorkerTaskDefinition', {
@@ -471,7 +481,7 @@ export class PolycastOrchestrationStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'SyncLabsSecretArn', {
       value: this.syncLabsSecret.secretArn,
       description:
-        'Put the sync.so API key in field apiKey, then deploy with lipSyncProvider=synclabs',
+        'sync.so API key (field apiKey); set by the SyncLabsApiKeyParameter stack parameter on deploy',
     });
     new cdk.CfnOutput(this, 'EventBusName', { value: this.eventBus.eventBusName });
     new cdk.CfnOutput(this, 'StageQueueUrl', { value: this.stageQueue.queueUrl });
