@@ -35,11 +35,18 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from .. import __version__
 from ..storage import Storage, StorageError, StorageUriError, join_uri
 from ..tools import Tools
 from .base import AsyncHandle, CapabilityRecord, ProviderContext, ProviderError
 
 ADAPTER_ID = "synclabs-lipsync"
+# sync.so sits behind Cloudflare bot protection, which blocks urllib's default
+# `Python-urllib/x.y` identity ("blocked access based on your browser's signature").
+# A descriptive product User-Agent is what an API client is expected to send.
+USER_AGENT = (
+    f"polycast-media-worker/{__version__} (+https://github.com/vtabsiii/podcast-language-encoder)"
+)
 DEFAULT_API_URL = "https://api.sync.so"
 DEFAULT_MODEL = "lipsync-2"
 DEFAULT_SYNC_MODE = "bounce"
@@ -272,7 +279,11 @@ class SyncLabsLipSyncProvider:
         return _https_only(url, "input URL")
 
     def _headers(self, *, json_body: bool) -> dict[str, str]:
-        headers = {"x-api-key": self._api_key, "accept": "application/json"}
+        headers = {
+            "x-api-key": self._api_key,
+            "accept": "application/json",
+            "user-agent": USER_AGENT,
+        }
         if json_body:
             headers["content-type"] = "application/json"
         return headers
@@ -362,7 +373,9 @@ class SyncLabsLipSyncProvider:
         )
 
     def _store_output(self, url: str, uri: str) -> None:
-        req = urllib.request.Request(url, method="GET")  # noqa: S310 - https enforced
+        req = urllib.request.Request(  # noqa: S310 - https enforced
+            url, method="GET", headers={"user-agent": USER_AGENT}
+        )
         with tempfile.TemporaryDirectory(prefix="polycast-lipsync-") as d:
             path = Path(d) / "output.mp4"
             try:
