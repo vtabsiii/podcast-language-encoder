@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 
-from polycast_worker.providers import LipSyncProvider
+from polycast_worker.providers import LipSyncProvider, synclabs
 from polycast_worker.providers.base import AsyncHandle, ProviderContext, ProviderError
 from polycast_worker.providers.synclabs import (
     ADAPTER_ID,
@@ -157,6 +157,21 @@ def test_capabilities_register_beta_and_never_production() -> None:
         SyncLabsLipSyncProvider(
             "k", storage=MemoryStorage(), tools=Tools.none(), api_url="http://x"
         )
+
+
+def test_requests_identify_the_worker_not_python_urllib(monkeypatch: pytest.MonkeyPatch) -> None:
+    storage = MemoryStorage()
+    storage.put(VIDEO, b"v", "video/mp4")
+    storage.put(AUDIO, b"a", "audio/wav")
+    vendor = FakeVendor(["COMPLETED"])
+    monkeypatch.setattr(urllib.request, "urlopen", vendor)
+    provider = _provider(storage)
+    handle = provider.render({"videoUri": VIDEO, "audioUri": AUDIO}, _ctx())
+    provider.evaluate(handle, _ctx())
+    agents = {call["headers"].get("user-agent") for call in vendor.calls}
+    assert agents == {synclabs.USER_AGENT}
+    assert synclabs.USER_AGENT.startswith("polycast-media-worker/")
+    assert "python-urllib" not in synclabs.USER_AGENT.lower()
 
 
 def test_render_polls_to_completion_and_stores_the_output(
