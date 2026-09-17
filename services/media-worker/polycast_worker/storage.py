@@ -173,13 +173,18 @@ class S3Storage:
     ) -> None:
         if client is None:
             import boto3
+            from botocore.config import Config
 
+            # Signature Version 4 is mandatory for presigned URLs to SSE-KMS objects (every
+            # Polycast bucket); in us-east-1 botocore would otherwise still emit SigV2 links,
+            # which S3 rejects and an external vendor reports as "URL inaccessible".
             client = boto3.client(
                 "s3",
                 endpoint_url=endpoint_url,
                 region_name=region,
                 aws_access_key_id=access_key_id,
                 aws_secret_access_key=secret_access_key,
+                config=Config(signature_version="s3v4"),
             )
         self._client: Any = client
 
