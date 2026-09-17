@@ -152,18 +152,20 @@ def test_s3_storage_maps_operations_onto_the_client(tmp_path: Path):
         store.get("local://derived/x/y")
 
 
-def test_real_client_presigns_with_signature_v4(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_real_client_presigns_with_signature_v4() -> None:
     """SSE-KMS objects can only be fetched through SigV4 URLs; SigV2 is botocore's us-east-1
     default and S3 answers it with 400, which the lip-sync vendor reported as inaccessible."""
-    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIAEXAMPLE")
-    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "not-a-real-secret")
-    monkeypatch.setenv("AWS_SESSION_TOKEN", "session-token")
-    store = S3Storage(region="us-east-1")
+    # Explicit static credentials keep the test independent of the host's AWS setup.
+    store = S3Storage(
+        region="us-east-1",
+        access_key_id="AKIAEXAMPLE",
+        secret_access_key="not-a-real-secret",  # noqa: S106 - fixture value
+    )
     url = store.presigned_get_url("s3://polycast-source-1-us-east-1/org/asset/source.mp4", 900)
     query = dict(part.split("=", 1) for part in url.split("?", 1)[1].split("&"))
     assert query["X-Amz-Algorithm"] == "AWS4-HMAC-SHA256"
     assert query["X-Amz-Expires"] == "900"
-    assert "X-Amz-Security-Token" in query
+    assert query["X-Amz-Credential"].startswith("AKIAEXAMPLE%2F")
     assert "AWSAccessKeyId" not in query and "Signature" not in query
 
 
