@@ -85,7 +85,7 @@ class _File:
 
 
 def _fetch_media(
-    task: WorkerTask, params: TargetParams, storage: Storage, wd: Path
+    task: WorkerTask, params: TargetParams, storage: Storage, wd: Path, *, is_mock: bool
 ) -> tuple[Path, str]:
     source_uri = require_source(task)
     preferred = "mp4" if params.metadata.video is not None else "mp3"
@@ -96,6 +96,11 @@ def _fetch_media(
             local = wd / f"media.{ext}"
             storage.download(uri, local)
             return local, ext
+    if not is_mock:
+        # With real providers the encode is the deliverable; the untouched source never is.
+        raise StageError(
+            "ENCODE_MISSING", "No encoded output was found to package for this target."
+        )
     local = wd / f"media.{fallback_ext}"
     storage.download(source_uri, local)
     return local, fallback_ext
@@ -219,7 +224,7 @@ def run(
     current = translations_by_segment(params)
 
     with workdir() as wd:
-        media_path, media_ext = _fetch_media(task, params, storage, wd)
+        media_path, media_ext = _fetch_media(task, params, storage, wd, is_mock=providers.is_mock)
         files: list[_File] = [
             _File("media", f"episode.{locale}.{media_ext}", content_type_for(media_ext), media_path)
         ]

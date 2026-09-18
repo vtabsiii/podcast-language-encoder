@@ -36,10 +36,15 @@ def test_filter_graph_and_loudnorm_parsing(tmp_path: Path) -> None:
         SpeechPlacement("a", tmp_path / "a.wav", 1_000_000, 3_500_000),
         SpeechPlacement("b", tmp_path / "b.wav", 4_250_000, 6_000_000),
     ]
-    assert duck_expression(p) == "between(t,1.000000,3.500000)+between(t,4.250000,6.000000)"
+    assert duck_expression(p, 0) == "between(t,1.000000,3.500000)+between(t,4.250000,6.000000)"
+    # The original voice is silenced (gain 0) with a 150 ms pad around every placement.
+    assert duck_expression(p) == "between(t,0.850000,3.650000)+between(t,4.100000,6.150000)"
+    assert duck_expression([SpeechPlacement("z", tmp_path / "z.wav", 0, 500_000)]).startswith(
+        "between(t,0.000000,"
+    )
     graph = build_dub_filter(p, 2)
     assert graph.startswith("[0:a]aresample=48000,aformat=sample_fmts=s16:channel_layouts=stereo")
-    assert "volume=0.15:enable='between(t,1.000000,3.500000)+" in graph
+    assert "volume=0.0:enable='between(t,0.850000,3.650000)+" in graph
     assert "[1:a]" in graph and "adelay=1000:all=1[s1]" in graph
     assert "adelay=4250:all=1[s2]" in graph
     assert graph.endswith("[bed][s1][s2]amix=inputs=3:normalize=0:duration=first[mixed]")

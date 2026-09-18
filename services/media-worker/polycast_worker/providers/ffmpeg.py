@@ -35,7 +35,12 @@ FIXTURE_TRUE_PEAK = -1.0
 TARGET_LUFS_STEREO = -16.0
 TARGET_LUFS_MONO = -19.0
 TARGET_TRUE_PEAK = -1.0
-DUCK_GAIN = 0.15  # ≈ −16.5 dB under the dubbed dialogue
+# There is no dialogue/bed stem separation yet (FR-007), so on a spoken-word source the
+# "bed" is the untranslated voice itself. It is silenced, not merely ducked, while dubbed
+# speech plays; the original is kept only in the gaps (intro music, ambience). A small pad
+# around every placement swallows syllables that straddle a segment boundary.
+DUCK_GAIN = 0.0
+BED_MUTE_PAD_US = 150_000
 MIX_RATE = 48000
 
 _LOUDNORM_JSON_RE = re.compile(r"\{[^{}]*\"input_i\"[^{}]*\}", re.S)
@@ -229,10 +234,12 @@ def parse_loudnorm_json(stderr: str) -> dict[str, str] | None:
     return {str(k): str(v) for k, v in data.items()}
 
 
-def duck_expression(placements: list[SpeechPlacement]) -> str:
-    """`volume` timeline expression enabling the duck only while dubbed speech plays."""
+def duck_expression(placements: list[SpeechPlacement], pad_us: int = BED_MUTE_PAD_US) -> str:
+    """`volume` timeline expression enabling the mute only while dubbed speech plays."""
     return "+".join(
-        f"between(t,{_us_to_seconds(p.start_us)},{_us_to_seconds(p.end_us)})" for p in placements
+        f"between(t,{_us_to_seconds(max(0, p.start_us - pad_us))},"
+        f"{_us_to_seconds(p.end_us + pad_us)})"
+        for p in placements
     )
 
 

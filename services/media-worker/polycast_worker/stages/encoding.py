@@ -4,13 +4,15 @@
     mediaconvert  CreateJob / GetJob polled every 5 s with lease heartbeats
 
 Both write `encode.<ext>` under this stage's derived prefix. When LIP_SYNCING produced a
-lip-synced video for this target it is the encode source (its picture, the MIXING audio);
-otherwise the original source is.
+lip-synced video for this target it is the encode source (its picture, the MIXING audio).
+The original source is used only when lip sync was not requested or only the mock vendor is
+configured; a requested real lip sync whose video is missing fails the stage.
 """
 
 from __future__ import annotations
 
 from ..models import EncodingOutput, WorkerTask
+from ..providers.mock import MockLipSyncProvider
 from ..storage import Storage
 from ..tools import Tools
 from .common import (
@@ -37,6 +39,13 @@ def run(
         lip_synced = find_lip_sync_video(task, storage)
         if lip_synced is not None:
             source_uri = lip_synced
+        elif params.lipSync and not isinstance(env.providers.lip_sync, MockLipSyncProvider):
+            # Never ship the untouched picture when the target asked for lip sync and a real
+            # vendor is configured: that is a broken pipeline, not a degraded deliverable.
+            raise StageError(
+                "LIP_SYNC_OUTPUT_MISSING",
+                "Lip sync was requested but no lip-synced video was found for this target.",
+            )
     provider = env.providers.encode
     ctx = provider_context(task, env.providers.region)
     with workdir() as wd:
