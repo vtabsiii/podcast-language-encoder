@@ -15,6 +15,7 @@ from ..storage import Storage
 from ..tools import Tools
 from .common import (
     StageEnv,
+    StageError,
     derived_uri,
     find_speech_wav,
     require_source,
@@ -45,7 +46,13 @@ def run(
                 continue
             uri = find_speech_wav(task, storage, sp.segmentId)
             if uri is None:
-                continue
+                if env.providers.is_mock:
+                    continue  # mock renders carry no audio
+                raise StageError(
+                    "SPEECH_RENDER_MISSING",
+                    "A dubbed speech render is missing, so the mix would keep the original voice.",
+                    retryable=True,
+                )
             wav = wd / f"speech-{sp.segmentId}.wav"
             storage.download(uri, wav)
             start = seg.range.start
@@ -53,6 +60,8 @@ def run(
                 SpeechPlacement(sp.segmentId, wav, start, start + wav_duration_us(wav))
             )
         placements.sort(key=lambda p: p.start_us)
+        if not placements and not env.providers.is_mock and params.speech:
+            raise StageError("SPEECH_RENDER_MISSING", "No dubbed speech renders were found to mix.")
         mix = wd / MIX_FILE
         lufs, peak = env.providers.mixer.mix(local, placements, mix, channels=channels)
         uri = derived_uri(task, MIX_FILE)

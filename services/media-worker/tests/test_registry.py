@@ -31,6 +31,7 @@ from polycast_worker.providers.quality import InHouseQualityProvider
 from polycast_worker.providers.registry import build_providers
 from polycast_worker.providers.synclabs import SyncLabsLipSyncProvider
 from polycast_worker.stages import packaging
+from polycast_worker.stages.common import StageError, sibling_uri
 from polycast_worker.tools import Tools
 
 from .aws_stubs import MemoryStorage, aws_config, aws_providers, segment_dicts, target_task
@@ -166,6 +167,11 @@ def test_packaging_manifest_in_aws_mode_is_honest(tmp_path: Path) -> None:
     from .aws_stubs import env_for
 
     env, _ = env_for(providers)
+    # With real providers the untouched source is never packaged in place of the encode.
+    with pytest.raises(StageError) as info:
+        packaging.run(task, storage, Tools.none(), env)
+    assert info.value.code == "ENCODE_MISSING"
+    storage.put(sibling_uri(task, "ENCODING", "encode.mp3"), b"ID3fake-mp3-bytes", "audio/mpeg")
     out = packaging.run(task, storage, Tools.none(), env)
     validate_schema("output-packaging", out)
     manifest = out["manifest"]
