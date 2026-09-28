@@ -1,0 +1,90 @@
+name: Teardown Polycast (manual)
+
+# MANUAL ONLY. Destroys the seven Polycast* stacks (web, orchestration, API, Cognito, Aurora,
+# storage, network) so their running resources stop billing: NAT gateway, Fargate services,
+# load balancers, CloudFront, Aurora Serverless v2, queues, alarms.
+#
+# Two passes: the first deploys PolycastData with polycastTeardown=true, which only lifts the
+# Aurora cluster's deletion protection (nothing else changes); the second runs
+# `cdk destroy 'Polycast*'`, which CloudFormation executes in reverse dependency order.
+#
+# What survives on purpose (see docs/aws-setup.md "Teardown"):
+#   - the four media buckets and the KMS key (RemovalPolicy.RETAIN): objects stay, pennies/month;
+#   - the Cognito user pool (RETAIN + deletion protection): free;
+#   - a final Aurora snapshot (RemovalPolicy.SNAPSHOT): snapshot storage only;
+#   - the legacy encoder stack (PodcastLanguageEncoder, pay-per-use) and the OIDC stack.
+# Deleted Secrets Manager secrets are scheduled for deletion (30 days); a redeploy within that
+# window must restore or force-delete them first.
+#
+# Authentication is GitHub OIDC (no AWS keys). Never add a push/pull_request trigger here.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "destroy-polycast" to confirm you want to delete the Polycast stacks'
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-polycast
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # required to request the OIDC token
+  contents: read
+
+jobs:
+  teardown:
+    name: cdk destroy Polycast*
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: production
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+    steps:
+      - name: Check confirmation
+        if: ${{ inputs.confirm != 'destroy-polycast' }}
+        run: |
+          echo "::error::Refusing to destroy: the confirm input must be exactly 'destroy-polycast'."
+          exit 1
+
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @polycast/infra build
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Lift Aurora deletion protection
+        working-directory: infra
+        run: >-
+          npx cdk deploy PolycastData
+          --exclusively
+          --require-approval never
+          -c polycastTeardown=true
+
+      - name: cdk destroy
+        working-directory: infra
+        run: >-
+          npx cdk destroy 'Polycast*'
+          --force
+          -c polycastTeardown=true
+
+      - name: Summary
+        run: |
+          {
+            echo "## Polycast torn down"
+            echo "- Destroyed: PolycastWeb, PolycastOrchestration, PolycastApi, PolycastAuth, PolycastData, PolycastStorage, PolycastNetwork"
+            echo "- Kept on purpose: media buckets + KMS key (RETAIN), Cognito user pool (RETAIN), final Aurora snapshot, legacy encoder + OIDC stacks"
+            echo "- Deleted secrets are scheduled for deletion (30 days)"
+          } >> "$GITHUB_STEP_SUMMARY"
