@@ -79,6 +79,9 @@ const polycastCognitoDomainPrefix =
   contextString('polycastCognitoDomainPrefix') ?? `polycast-${cdk.Aws.ACCOUNT_ID}`;
 const polycastMonthlyBudgetUsd = Number(contextString('polycastMonthlyBudgetUsd') ?? 200);
 const polycastCloudFrontPublicKeyPem = contextString('polycastCloudFrontPublicKeyPem');
+// polycastTeardown=true lifts the Aurora deletion protection so `cdk destroy 'Polycast*'`
+// can remove the cluster (a final snapshot is still taken). Only the teardown workflow sets it.
+const polycastTeardown = contextString('polycastTeardown') === 'true';
 
 const network = new PolycastNetworkStack(app, 'PolycastNetwork', {
   env,
@@ -93,6 +96,7 @@ const data = new PolycastDataStack(app, 'PolycastData', {
   env,
   vpc: network.vpc,
   encryptionKey: storage.key,
+  teardown: polycastTeardown,
   description: 'Polycast Studio: Aurora PostgreSQL Serverless v2',
 });
 const auth = new PolycastAuthStack(app, 'PolycastAuth', {

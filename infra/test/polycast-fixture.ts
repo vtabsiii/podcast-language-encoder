@@ -15,6 +15,7 @@ export interface PolycastFixtureOptions {
   lipSyncProvider?: 'mock' | 'synclabs';
   bootstrapAdminEmail?: string;
   bootstrapAdminResendKey?: string;
+  teardown?: boolean;
 }
 
 /**
@@ -30,6 +31,7 @@ export function buildPolycastApp(options: PolycastFixtureOptions = {}) {
   const data = new PolycastDataStack(app, 'PolycastData', {
     vpc: network.vpc,
     encryptionKey: storage.key,
+    teardown: options.teardown,
   });
   const auth = new PolycastAuthStack(app, 'PolycastAuth', {
     domainPrefix: 'polycast-test',

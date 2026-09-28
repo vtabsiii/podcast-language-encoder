@@ -15,6 +15,12 @@ export interface PolycastDataStackProps extends cdk.StackProps {
   /** Aurora Serverless v2 capacity range in ACUs. */
   minCapacity?: number;
   maxCapacity?: number;
+  /**
+   * Lift the cluster's deletion protection so the stack can be destroyed. The removal policy
+   * stays SNAPSHOT, so a final snapshot is taken before the cluster goes. Set only by the
+   * teardown workflow (context `polycastTeardown=true`), never in a normal deploy.
+   */
+  teardown?: boolean;
 }
 
 /**
@@ -64,7 +70,7 @@ export class PolycastDataStack extends cdk.Stack {
       storageEncryptionKey: props.encryptionKey,
       backup: { retention: cdk.Duration.days(35), preferredWindow: '06:00-07:00' },
       preferredMaintenanceWindow: 'sun:07:00-sun:08:00',
-      deletionProtection: true,
+      deletionProtection: !props.teardown,
       removalPolicy: cdk.RemovalPolicy.SNAPSHOT,
       copyTagsToSnapshot: true,
       cloudwatchLogsExports: ['postgresql'],

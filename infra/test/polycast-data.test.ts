@@ -28,6 +28,14 @@ describe('PolycastDataStack', () => {
     });
   });
 
+  test('teardown mode lifts deletion protection but still snapshots the cluster', () => {
+    const teardown = Template.fromStack(buildPolycastApp({ teardown: true }).data);
+    teardown.hasResource('AWS::RDS::DBCluster', {
+      Properties: Match.objectLike({ DeletionProtection: false }),
+      DeletionPolicy: 'Snapshot',
+    });
+  });
+
   test('cluster parameter group forces TLS', () => {
     template.hasResourceProperties('AWS::RDS::DBClusterParameterGroup', {
       Parameters: { 'rds.force_ssl': '1' },
