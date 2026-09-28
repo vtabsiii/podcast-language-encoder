@@ -150,6 +150,7 @@ Pass with `-c key=value` (or `cdk.json` context); all are optional.
 | `polycastCognitoDomainPrefix` | `polycast-<account id>` | hosted UI domain prefix (globally unique per region) |
 | `polycastMonthlyBudgetUsd` | `200` | monthly cost budget |
 | `polycastCloudFrontPublicKeyPem` | unset | RSA public key; enables the signed `/media/*` behaviour |
+| `polycastTeardown` | unset | `true` lifts the Aurora cluster's deletion protection so the stacks can be destroyed; set only by the teardown workflow |
 
 ### Deploying
 
@@ -252,15 +253,25 @@ of this account to read the derived bucket and use the key.
 
 ### Teardown
 
-Order matters because of cross-stack references, and buckets, the KMS key and the user pool
-are retained on purpose (they hold user content and identities):
+`Teardown Polycast (manual)` (`.github/workflows/teardown-polycast.yml`, confirm =
+`destroy-polycast`) stops the running costs: NAT gateway, the API/web/worker Fargate services
+and their load balancers, CloudFront, Aurora Serverless v2, queues, state machines and alarms.
+It runs two passes: `cdk deploy PolycastData --exclusively -c polycastTeardown=true` lifts the
+cluster's deletion protection (the only change that context makes), then
+`cdk destroy 'Polycast*'` removes the seven stacks in reverse dependency order. Deleted
+Secrets Manager secrets are scheduled for deletion for 30 days; a redeploy inside that window
+fails on the fixed-name `polycast/synclabs` until it is restored or force-deleted.
+
+From a laptop, order matters because of cross-stack references, and buckets, the KMS key and
+the user pool are retained on purpose (they hold user content and identities):
 
 ```bash
 cd infra
+npx cdk deploy PolycastData --exclusively -c polycastTeardown=true   # lifts deletion protection only
 npx cdk destroy PolycastWeb PolycastOrchestration      # services, queues, state machines, budget
 npx cdk destroy PolycastApi                            # API service, internal ALB, migrate task
 npx cdk destroy PolycastAuth                           # user pool is RETAIN + deletion protection: remove manually if really wanted
-npx cdk destroy PolycastData                           # deletion protection must be disabled first; final snapshot is taken
+npx cdk destroy PolycastData -c polycastTeardown=true  # final snapshot is taken
 npx cdk destroy PolycastStorage PolycastNetwork        # buckets and key remain; empty/delete them in S3 and schedule key deletion
 ```
 
